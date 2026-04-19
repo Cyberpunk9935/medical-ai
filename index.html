@@ -1,0 +1,2245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Medical AI Diagnosis System</title>
+  <style>
+    :root{
+      --bg1:#e0f4ff;
+      --bg2:#f2fff6;
+      --accent:#1ab3b8;
+      --accent-soft:#6ee7b7;
+      --accent-blue:#38bdf8;
+      --glass:rgba(255,255,255,0.7);
+      --muted:#4f7a93;
+      --text:#0f3049;
+    }
+    [data-theme="dark"]{
+      --bg1:#0f172a;
+      --bg2:#1e293b;
+      --accent:#2dd4bf;
+      --accent-soft:#14b8a6;
+      --accent-blue:#0ea5e9;
+      --glass:rgba(30,41,59,0.8);
+      --muted:#94a3b8;
+      --text:#f1f5f9;
+    }
+    [data-theme="dark"] .card,
+    [data-theme="dark"] .floating-card,
+    [data-theme="dark"] .modal-card {
+      background:linear-gradient(200deg,rgba(30,41,59,0.95),rgba(15,23,42,0.9));
+      border-color:rgba(255,255,255,0.1);
+      box-shadow:0 25px 50px rgba(0,0,0,0.5);
+    }
+    [data-theme="dark"] .input,
+    [data-theme="dark"] .sym-item,
+    [data-theme="dark"] .doc-card,
+    [data-theme="dark"] .appt-item {
+      background:rgba(30,41,59,0.6);
+      border-color:rgba(255,255,255,0.1);
+    }
+    [data-theme="dark"] #time_slots { background:rgba(0,0,0,0.3) !important; }
+    
+    /* Chat improvements */
+    .typing { display:flex; gap:4px; padding:8px 12px; background:rgba(255,255,255,0.8); border-radius:12px 12px 12px 0; align-self:flex-start; width:fit-content; margin-bottom:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05) }
+    .typing span { width:6px; height:6px; background:#888; border-radius:50%; animation:type 1.4s infinite ease-in-out both }
+    .typing span:nth-child(1){animation-delay:0s} .typing span:nth-child(2){animation-delay:0.2s} .typing span:nth-child(3){animation-delay:0.4s}
+    @keyframes type { 0%,80%,100% { transform:scale(0) } 40% { transform:scale(1) } }
+    .quick-actions { display:flex; gap:6px; padding:8px; overflow-x:auto; border-top:1px solid rgba(0,0,0,0.05); scrollbar-width:none }
+    .quick-btn { white-space:nowrap; font-size:11px; padding:6px 12px; border-radius:12px; border:1px solid var(--accent); background:rgba(255,255,255,0.5); color:var(--text); cursor:pointer; transition:all 0.2s }
+    .quick-btn:hover { background:var(--accent); color:white }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,Arial;
+      background:linear-gradient(160deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      min-height:100vh;
+      position:relative;
+      overflow-x:hidden;
+    }
+    .app{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:36px;position:relative;perspective:1400px;z-index:2}
+    .container{width:1100px;max-width:98%;}
+
+    .bg-elements{
+      position:fixed;
+      inset:-50px;
+      overflow:hidden;
+      pointer-events:none;
+      z-index:1;
+    }
+    .orb{
+      position:absolute;
+      width:420px;
+      height:420px;
+      border-radius:50%;
+      filter:blur(0px);
+      opacity:0.55;
+      transform-style:preserve-3d;
+      animation:floatOrb 12s ease-in-out infinite alternate;
+    }
+    .orb.blue{background:radial-gradient(circle at 30% 30%,rgba(56,189,248,0.85),rgba(12,74,110,0.25));top:-120px;left:-80px;animation-delay:0s}
+    .orb.green{background:radial-gradient(circle at 70% 70%,rgba(110,231,183,0.85),rgba(6,95,70,0.25));bottom:-150px;right:-120px;animation-delay:1.4s}
+    .orb.mint{background:radial-gradient(circle at 50% 50%,rgba(125,211,252,0.8),rgba(16,185,129,0.18));top:40%;right:10%;width:320px;height:320px;animation-delay:2.1s}
+
+    .floating-card{
+      position:absolute;
+      background:linear-gradient(160deg,rgba(255,255,255,0.92),rgba(232,249,255,0.82));
+      border-radius:18px;
+      padding:16px 22px;
+      box-shadow:0 35px 70px rgba(15,70,90,0.12);
+      border:1px solid rgba(79,122,147,0.14);
+      color:var(--text);
+      transform-style:preserve-3d;
+      animation:floatPanel 9s ease-in-out infinite;
+      display:flex;
+      align-items:center;
+      gap:14px;
+    }
+    .floating-card::before{
+      content:"";
+      width:38px;
+      height:38px;
+      border-radius:12px;
+      background:linear-gradient(140deg,var(--accent),var(--accent-blue));
+      box-shadow:0 16px 32px rgba(26,179,184,0.32);
+      display:block;
+    }
+    .floating-card span{font-weight:600;color:var(--text)}
+    .floating-card p{margin:0;font-size:12px;color:var(--muted)}
+
+    .floating-card.card-1{top:18%;left:8%;animation-delay:.4s}
+    .floating-card.card-2{bottom:14%;left:12%;animation-delay:1.2s}
+    .floating-card.card-3{top:32%;right:12%;animation-delay:2.4s}
+
+    .med-icon{
+      position:absolute;
+      width:120px;
+      height:120px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:30px;
+      background:linear-gradient(150deg,rgba(56,189,248,0.28),rgba(110,231,183,0.32));
+      box-shadow:0 25px 55px rgba(15,70,90,0.12);
+      color:var(--accent);
+      font-size:46px;
+      font-weight:700;
+      animation:floatIcon 10s ease-in-out infinite;
+    }
+    .med-icon.cross{top:10%;right:32%;animation-delay:0.6s}
+    .med-icon.heart{bottom:12%;right:24%;animation-delay:1.5s}
+    .med-icon.steth{top:56%;left:6%;animation-delay:2.2s}
+
+    @keyframes floatOrb{
+      0%{transform:translate3d(0,0,0) scale(1)}
+      50%{transform:translate3d(20px,-30px,40px) scale(1.05)}
+      100%{transform:translate3d(-20px,30px,-40px) scale(0.95)}
+    }
+    @keyframes floatPanel{
+      0%{transform:translate3d(0,0,0) rotateX(0deg) rotateY(0deg)}
+      50%{transform:translate3d(0,-18px,18px) rotateX(4deg) rotateY(-3deg)}
+      100%{transform:translate3d(0,0,0) rotateX(0deg) rotateY(0deg)}
+    }
+    @keyframes floatIcon{
+      0%{transform:translate3d(0,0,0) rotate(-4deg)}
+      50%{transform:translate3d(0,-18px,12px) rotate(4deg)}
+      100%{transform:translate3d(0,0,0) rotate(-4deg)}
+    }
+
+    /* Card */
+    .card{
+      background:linear-gradient(200deg,rgba(255,255,255,0.96),rgba(240,252,255,0.88));
+      border-radius:20px;
+      padding:24px;
+      border:1px solid rgba(255,255,255,0.6);
+      box-shadow:0 30px 60px rgba(15,70,90,0.15);
+      backdrop-filter: blur(18px);
+      transition:transform .35s cubic-bezier(.2,.9,.3,1), box-shadow .35s;
+    }
+    .card.hover-3d{transform:perspective(900px) translateZ(0)}
+    
+    /* Dynamic Entry Animation */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #app > * { animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    #app > *:nth-child(2) { animation-delay: 0.1s; }
+    #app > *:nth-child(3) { animation-delay: 0.2s; }
+    
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    /* Smoother tilt for JS */
+    #app { transition: transform 0.1s ease-out, box-shadow 0.35s; }
+
+    /* Disable animations/dynamic effects */
+    .orb,
+    .floating-card,
+    .med-icon,
+    #app > *,
+    .typing span {
+        animation: none !important;
+    }
+    #app { transition: none !important; }
+
+    header{display:flex;align-items:center;gap:18px;margin-bottom:18px;position:relative;z-index:2}
+    .logo{
+      width:90px;
+      height:90px;
+      border-radius:18px;
+      background:linear-gradient(140deg,var(--accent-blue),var(--accent));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:800;
+      font-size:28px;
+      color:#f0ffff;
+      box-shadow:0 25px 45px rgba(26,179,184,0.25);
+    }
+    h1{margin:0;font-size:28px;color:var(--text)}
+    p.lead{margin:4px 0 0;color:var(--muted)}
+
+    .row{display:flex;gap:18px}
+    .col{flex:1}
+
+    /* Buttons and inputs */
+    .btn{padding:10px 16px;border-radius:12px;border:none;cursor:pointer;font-weight:700}
+    .btn-primary{
+      background:linear-gradient(140deg,var(--accent),var(--accent-blue));
+      color:#f5fffd;
+      box-shadow:0 18px 40px rgba(26,179,184,0.28);
+    }
+    .btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(79,122,147,0.2)}
+    .muted{color:var(--muted);font-size:13px}
+
+    .input{
+      width:100%;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(79,122,147,0.2);
+      background:linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,252,255,0.82));
+      color:var(--text);
+      box-shadow:0 12px 32px rgba(15,70,90,0.06);
+    }
+    .input:focus{outline:none;box-shadow:0 18px 45px rgba(26,179,184,0.15);border-color:rgba(26,179,184,0.4)}
+    label{display:block;margin-bottom:6px;font-size:13px;color:var(--muted)}
+
+    /* Symptom checkboxes */
+    .sym-list{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .sym-item{
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(79,122,147,0.18);
+      background:rgba(255,255,255,0.9);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      box-shadow:0 14px 36px rgba(15,70,90,0.08);
+      transition:transform .25s ease, box-shadow .25s;
+    }
+    .sym-item:hover{transform:translateY(-4px);box-shadow:0 24px 48px rgba(26,179,184,0.18)}
+
+    /* Graph */
+    .bars{display:flex;gap:16px;align-items:end;height:220px;padding:12px;position:relative;z-index:2}
+    .bar{flex:1;display:flex;flex-direction:column;align-items:center}
+    .bar-inner{width:100%;background:linear-gradient(180deg,var(--accent-blue),var(--accent-soft));border-radius:12px;transition:height .8s cubic-bezier(.2,.9,.3,1);box-shadow:0 22px 45px rgba(15,70,90,0.16)}
+    .bar-label{margin-top:8px;font-size:13px;color:var(--muted);text-align:center}
+
+    /* Pie Chart */
+    .pie-chart{width:140px;height:140px;border-radius:50%;position:relative;box-shadow:0 10px 25px rgba(15,70,90,0.15)}
+    .pie-legend{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted)}
+    .pie-item{display:flex;align-items:center;gap:8px}
+    .pie-dot{width:10px;height:10px;border-radius:50%}
+
+    /* Doctor profile */
+    .doc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .doc-card{
+      padding:16px;
+      border-radius:18px;
+      background:linear-gradient(200deg,rgba(255,255,255,0.94),rgba(236,249,255,0.9));
+      border:1px solid rgba(79,122,147,0.18);
+      cursor:pointer;
+      transition:transform .25s ease, box-shadow .25s;
+      box-shadow:0 20px 45px rgba(15,70,90,0.12);
+    }
+    
+    /* Toast notifications */
+    .toast-container{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:20000}
+    .toast{padding:12px 18px;border-radius:12px;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,0.2);animation:fadein 0.3s ease-out}
+    .toast-success{background:#2dd4bf}
+    .toast-error{background:#f87171}
+    .toast-info{background:#3b82f6}
+    @keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+    .doc-card:hover{transform:translateY(-6px) scale(1.02);box-shadow:0 35px 70px rgba(26,179,184,0.22)}
+    .avatar{width:78px;height:78px;border-radius:16px;background:linear-gradient(160deg,var(--accent-blue),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;color:#f0ffff}
+
+    /* Success modal */
+    .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(5,24,36,0.55),rgba(3,35,45,0.75));backdrop-filter:blur(14px);z-index:10}
+    .modal-card{width:540px;padding:28px;border-radius:18px;text-align:center;background:rgba(255,255,255,0.95);box-shadow:0 40px 80px rgba(15,70,90,0.25)}
+
+    /* Dashboard */
+    .appt-list{margin-top:16px}
+    .appt-item{
+      padding:14px;
+      border-radius:16px;
+      border:1px solid rgba(79,122,147,0.16);
+      background:rgba(255,255,255,0.92);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:12px;
+      box-shadow:0 16px 38px rgba(15,70,90,0.08);
+    }
+
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+
+    /* responsive */
+    @media (max-width:900px){
+      .sym-list{grid-template-columns:repeat(2,1fr)}
+      .doc-grid{grid-template-columns:repeat(1,1fr)}
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-elements">
+    <div class="orb blue"></div>
+    <div class="orb green"></div>
+    <div class="orb mint"></div>
+    <div class="floating-card card-1"><span>24/7 Care</span><p>Hospital-grade monitoring</p></div>
+    <div class="floating-card card-2"><span>AI Lab</span><p>Advanced diagnostics</p></div>
+    <div class="floating-card card-3"><span>Emergency</span><p>Rapid response team</p></div>
+    <div class="med-icon cross">+</div>
+    <div class="med-icon heart">❤</div>
+    <div class="med-icon steth">⚕</div>
+  </div>
+
+  <!-- Chat Widget -->
+  <div id="chat_widget" style="display:none;position:fixed;bottom:80px;right:20px;width:320px;height:450px;background:var(--bg2);border:1px solid rgba(255,255,255,0.2);border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,0.3);z-index:99;flex-direction:column;overflow:hidden;backdrop-filter:blur(12px)">
+    <div style="padding:12px 16px;background:linear-gradient(140deg,var(--accent),var(--accent-blue));color:white;font-weight:bold;display:flex;justify-content:space-between;align-items:center">
+      <span>Medical Assistant</span>
+      <div>
+        <button onclick="exportChat()" style="background:none;border:none;color:white;cursor:pointer;font-size:12px;margin-right:8px" title="Save Chat">💾</button>
+        <button onclick="clearChat()" style="background:none;border:none;color:white;cursor:pointer;font-size:12px;margin-right:8px">Clear</button>
+        <button onclick="toggleChat()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px">✕</button>
+      </div>
+    </div>
+    <div id="chat_msgs" style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;font-size:13px">
+      <div style="align-self:flex-start;background:rgba(255,255,255,0.8);padding:8px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:#333">Hello! I can help with disease info, prevention, medicines, or filing reports. How can I assist?</div>
+    </div>
+    <div class="quick-actions" id="quick_actions">
+      <button class="quick-btn" onclick="quickAction('Check Symptoms')">Check Symptoms</button>
+      <button class="quick-btn" onclick="quickAction('Health Tip')">Health Tip</button>
+      <button class="quick-btn" onclick="quickAction('Book Doctor')">Book Doctor</button>
+      <button class="quick-btn" onclick="quickAction('Emergency')">Emergency</button>
+    </div>
+    <div style="padding:10px;border-top:1px solid rgba(0,0,0,0.05);display:flex;gap:6px">
+      <input id="chat_input" type="text" class="input" style="padding:8px;font-size:13px" placeholder="Ask about flu, medicines..." onkeypress="if(event.key==='Enter') sendChat()">
+      <button class="btn btn-ghost" style="padding:8px 10px" onclick="startVoiceInput()" id="mic_btn" title="Speak">🎤</button>
+      <button class="btn btn-primary" style="padding:8px 12px" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <button onclick="toggleChat()" style="position:fixed;bottom:20px;right:80px;width:50px;height:50px;border-radius:50%;background:linear-gradient(140deg,var(--accent),var(--accent-blue));border:none;color:white;font-size:24px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.2);z-index:99;display:flex;align-items:center;justify-content:center">💬</button>
+
+  <button id="theme_toggle" class="btn btn-ghost" style="position:fixed;top:20px;right:20px;z-index:100;background:var(--glass);backdrop-filter:blur(10px);border-radius:50%;width:46px;height:46px;padding:0;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,0.1)">🌙</button>
+
+  <div class="app">
+    <div class="container card h-3d" id="app"></div>
+  </div>
+
+  <script>
+    // Single-page app without frameworks. Data persistence via localStorage.
+    const app = document.getElementById('app');
+
+    // Sample symptoms list - Expanded
+    const SYMPTOMS = ['Fever','Cough','Headache','Chest Pain','Fatigue','Shortness of Breath','Sore Throat','Dizziness','Rash','Nausea','Body Ache','Runny Nose','Sweating','Chills','Loss of Appetite','Weakness','Joint Pain','Sneezing','Itching','Abdominal Pain','Back Pain','Throat Irritation','Eye Pain','Ear Pain','Memory Loss','Confusion','Hair Loss','Weight Loss','Muscle Pain','Tremors'];
+
+    // Simple symptom->disease mapper for demo
+    const DISEASES = {
+      'Common Cold': ['cough','sore throat','runny nose','sneeze','body ache'],
+      'Flu': ['fever','cough','body ache','chills','fatigue'],
+      'COVID-19': ['fever','cough','shortness','loss of taste','fatigue','sore throat'],
+      'Asthma': ['shortness','wheeze','chest','cough'],
+      'Migraine': ['headache','nausea','sensitivity'],
+      'Heart Issue': ['chest pain','shortness','dizziness','sweat']
+    };
+
+    const PREVENTIONS = {
+      'Common Cold': ['Wash hands frequently', 'Stay hydrated', 'Rest', 'Vitamin C intake'],
+      'Flu': ['Annual flu shot', 'Avoid close contact', 'Cover mouth when coughing', 'Antiviral meds if prescribed'],
+      'COVID-19': ['Wear mask in crowds', 'Social distancing', 'Vaccination', 'Monitor oxygen levels'],
+      'Asthma': ['Avoid triggers (dust, smoke)', 'Use inhalers as prescribed', 'Breathing exercises', 'Regular checkups'],
+      'Migraine': ['Avoid loud noises/lights', 'Manage stress', 'Regular sleep schedule', 'Stay hydrated'],
+      'Heart Issue': ['Healthy diet (low salt)', 'Regular exercise', 'Monitor blood pressure', 'Avoid smoking/alcohol']
+    };
+
+    const MEDICINES = {
+      'Common Cold': ['Paracetamol', 'Decongestants', 'Cough Syrup', 'Vitamin C'],
+      'Flu': ['Oseltamivir (Tamiflu)', 'Ibuprofen', 'Rest & Fluids'],
+      'COVID-19': ['Paxlovid', 'Remdesivir', 'Antipyretics', 'Steroids (severe cases)'],
+      'Asthma': ['Albuterol Inhaler', 'Fluticasone', 'Montelukast'],
+      'Migraine': ['Sumatriptan', 'Ibuprofen', 'Rizatriptan', 'Magnesium'],
+      'Heart Issue': ['Aspirin', 'Beta-blockers', 'Statins', 'ACE Inhibitors']
+    };
+
+    const HEALTH_TIPS = [
+      "Drink at least 8 glasses of water a day to stay hydrated.",
+      "Aim for 30 minutes of moderate exercise daily.",
+      "Get 7-9 hours of sleep each night for optimal recovery.",
+      "Reduce sugar and processed food intake for better heart health.",
+      "Practice deep breathing or meditation to reduce stress.",
+      "Wash your hands frequently to prevent infections.",
+      "Eat a rainbow of fruits and vegetables for better immunity."
+    ];
+
+    const DOC_PROFILES = [
+      {id:1,name:'Dr. Anita Sharma',spec:'Cardiologist',exp:12,rating:4.7,avatar:'AS',bio:'Expert in heart rhythm disorders and preventive cardiology. 12+ years of experience in top hospitals.',achievements:['Published 15+ research papers on cardiac care','Fellow of American College of Cardiology','Performed 5000+ successful cardiac interventions','Speaker at International Cardiology Conference 2023-2024']},
+      {id:2,name:'Dr. Rajiv Kumar',spec:'Pulmonologist',exp:9,rating:4.6,avatar:'RK',bio:'Specializes in respiratory diseases, asthma management, and critical care medicine.',achievements:['Expert in lung transplantation','Published in Journal of Respiratory Medicine','Trained 50+ medical residents','Award for Excellence in Pulmonary Care 2022']},
+      {id:3,name:'Dr. Meera Joshi',spec:'General Physician',exp:6,rating:4.5,avatar:'MJ',bio:'Compassionate family doctor focusing on holistic health, preventive care, and chronic disease management.',achievements:['Diploma in Family Medicine','Over 10,000 patient consultations','Pioneer in telemedicine in rural areas','Health Education Programs in 20+ villages']},
+      {id:4,name:'Dr. Suresh Patel',spec:'Neurologist',exp:15,rating:4.8,avatar:'SP',bio:'Renowned neurologist treating migraines, epilepsy, and stroke recovery. Former head of neurology at City Hospital.',achievements:['Former Head of Neurology, City Hospital','Expert in stroke management','Treated 200+ complex neurological cases','Published 25+ papers on neurological conditions']},
+      {id:5,name:'Dr. Priya Desai',spec:'Dermatologist',exp:8,rating:4.6,avatar:'PD',bio:'Expert in clinical and cosmetic dermatology, treating acne, eczema, and skin infections.',achievements:['Specialized in laser therapy','Successful treatment of 3000+ skin conditions','Board Certified Dermatologist','Presenter at Asian Dermatology Summit']},
+      {id:6,name:'Dr. Amit Verma',spec:'Pediatrician',exp:10,rating:4.9,avatar:'AV',bio:'Dedicated to child health from infancy to adolescence. Special interest in developmental pediatrics.',achievements:['Pediatric Intensive Care Specialist','Managed 500+ complex pediatric cases','Founder of Child Health Awareness Program','Pediatric Board Certification with honors']},
+      {id:7,name:'Dr. Vikram Singh',spec:'Orthopedic Surgeon',exp:14,rating:4.8,avatar:'VS',bio:'Skilled orthopedic surgeon specializing in joint reconstruction and sports medicine.',achievements:['Performs advanced arthroscopic surgeries','Treated Olympic athletes','Expert in knee and shoulder reconstruction','Authored 12 orthopedic textbook chapters']},
+      {id:8,name:'Dr. Neha Gupta',spec:'Gynecologist',exp:11,rating:4.7,avatar:'NG',bio:'Compassionate gynecologist with expertise in maternal health and women\'s wellness.',achievements:['Specializes in high-risk pregnancies','Assisted 5000+ successful deliveries','Women\'s Health Ambassador','Expert in minimally invasive gynecological procedures']},
+      {id:9,name:'Dr. Rohan Verma',spec:'ENT Specialist',exp:8,rating:4.6,avatar:'RV',bio:'Experienced ENT specialist treating ear, nose, and throat disorders.',achievements:['Expert in endoscopic sinus surgery','Performed 1500+ ENT surgeries','Audiologist certified','Research on hearing loss prevention']},
+      {id:10,name:'Dr. Divya Saxena',spec:'Psychiatrist',exp:10,rating:4.7,avatar:'DS',bio:'Experienced psychiatrist focusing on mental health and behavioral disorders.',achievements:['Specializes in anxiety and depression management','Trained in cognitive behavioral therapy','Helped 2000+ patients achieve mental wellness','Mental Health Advocacy Award 2023']},
+      {id:11,name:'Dr. Arun Kapoor',spec:'Oncologist',exp:16,rating:4.9,avatar:'AK',bio:'Renowned cancer specialist with expertise in chemotherapy and radiation treatment.',achievements:['Specializes in breast and lung cancer','Treated 800+ cancer patients','Published 20+ oncology research papers','Cancer Research Fellowship from leading institutes']},
+      {id:12,name:'Dr. Pooja Sharma',spec:'Endocrinologist',exp:9,rating:4.6,avatar:'PS',bio:'Expert in diabetes and endocrine disorders management.',achievements:['Diabetes Care Specialist','Managed 3000+ diabetic patients','Innovative insulin therapy protocols','Regular speaker at endocrinology conferences'],
+        availability: ['09:00 AM','10:30 AM','01:00 PM','03:00 PM','04:30 PM']}
+    ];
+
+    // Medicine Side Effects
+    const SIDE_EFFECTS = {
+      'Paracetamol': ['Liver damage (high doses)', 'Rare allergic reactions', 'Nausea'],
+      'Ibuprofen': ['Stomach ulcers', 'Dizziness', 'Headache', 'Kidney issues (chronic use)'],
+      'Oseltamivir (Tamiflu)': ['Nausea', 'Vomiting', 'Diarrhea', 'Headache'],
+      'Albuterol Inhaler': ['Tremor', 'Headache', 'Increased heart rate', 'Anxiety'],
+      'Sumatriptan': ['Dizziness', 'Weakness', 'Tingling', 'Chest tightness'],
+      'Aspirin': ['Stomach irritation', 'Easy bruising', 'Rash', 'Allergic reactions'],
+      'Beta-blockers': ['Fatigue', 'Dizziness', 'Slow heart rate', 'Depression']
+    };
+
+    // Medical Test Recommendations
+    const TEST_RECOMMENDATIONS = {
+      'Common Cold': ['Rapid Antigen Test', 'Complete Blood Count'],
+      'Flu': ['Rapid Influenza Test', 'Throat Culture', 'Complete Blood Count'],
+      'COVID-19': ['RT-PCR Test', 'Antigen Test', 'CT Scan (if severe)', 'Blood Oxygen Level'],
+      'Asthma': ['Spirometry (Lung Function Test)', 'Peak Flow Test', 'Chest X-Ray', 'Allergy Testing'],
+      'Migraine': ['MRI Brain Scan', 'Neurological Exam', 'Blood Work'],
+      'Heart Issue': ['ECG (Electrocardiogram)', 'Echocardiogram', 'Troponin Blood Test', 'Stress Test', 'CT Angiography']
+    };
+
+    // Emergency Contacts
+    const EMERGENCY_CONTACTS = {
+      Hospital: '+91-11-4040-4040',
+      Ambulance: '102',
+      Police: '100',
+      Poison: '+91-11-4163-9969',
+      Helpline: '+91-9999-999-999',
+      MentalCrisis: '+91-22-2754-6669'
+    };
+
+    const DIET_PLANS = {
+      'Common Cold': {
+        description: 'Focus on hydration and immune-boosting foods. Warm liquids can help soothe a sore throat and loosen congestion.',
+        foodsToEat: ['Chicken Soup', 'Broths', 'Garlic', 'Citrus fruits (Oranges, Grapefruit)', 'Ginger Tea', 'Honey', 'Yogurt'],
+        foodsToAvoid: ['Alcohol', 'Caffeine', 'Sugary Drinks', 'Greasy or Fried Foods', 'Dairy (can thicken mucus for some)'],
+        samplePlan: {}
+      },
+      'Flu': {
+        description: 'Similar to a cold, the focus is on hydration and easy-to-digest foods to conserve energy for recovery. Electrolytes are important if experiencing vomiting or diarrhea.',
+        foodsToEat: ['Broth-based soups', 'Crackers and Toast (BRAT diet)', 'Oatmeal', 'Leafy Green Vegetables', 'Electrolyte-rich drinks', 'Herbal Teas'],
+        foodsToAvoid: ['Spicy Foods', 'High-fat meals', 'Excessive Sugar', 'Alcohol', 'Caffeine'],
+        samplePlan: {}
+      },
+      'COVID-19': {
+        description: 'A balanced, nutrient-dense diet is crucial for supporting the immune system during and after a COVID-19 infection. Focus on anti-inflammatory foods, protein, and hydration.',
+        foodsToEat: ['Lean Protein (Chicken, Fish, Beans)', 'A rainbow of Fruits & Vegetables', 'Whole Grains', 'Nuts and Seeds', 'Olive Oil', 'Plenty of Water'],
+        foodsToAvoid: ['Highly Processed Foods', 'Red Meat', 'Fried Foods', 'Refined Carbohydrates', 'Sugary snacks and beverages'],
+        samplePlan: {}
+      },
+      'Heart Issue': {
+        description: 'A heart-healthy diet is low in sodium, saturated fats, and cholesterol. It emphasizes fruits, vegetables, whole grains, and lean proteins.',
+        foodsToEat: ['Oats', 'Berries', 'Leafy Greens (Spinach, Kale)', 'Fatty Fish (Salmon, Mackerel)', 'Nuts & Seeds', 'Avocado'],
+        foodsToAvoid: ['Processed Meats (Sausages, Bacon)', 'Fried Foods', 'Sugary Drinks', 'Excessive Salt', 'Refined Carbohydrates (White Bread)'],
+        samplePlan: {
+          Monday: { Breakfast: 'Oatmeal with berries', Lunch: 'Grilled chicken salad', Dinner: 'Baked salmon with quinoa' },
+          Tuesday: { Breakfast: 'Yogurt with nuts', Lunch: 'Lentil soup', Dinner: 'Whole wheat pasta with vegetables' },
+          Wednesday: { Breakfast: 'Smoothie with spinach and fruit', Lunch: 'Leftover salmon', Dinner: 'Bean burrito bowl' }
+        }
+      },
+      'Diabetes': {
+        description: 'A diabetic diet focuses on controlling blood sugar levels. It involves eating healthy carbohydrates, fiber-rich foods, fish, and good fats.',
+        foodsToEat: ['Whole Grains (Brown Rice, Quinoa)', 'Non-starchy Vegetables (Broccoli, Peppers)', 'Beans', 'Citrus Fruits', 'Lean Protein (Chicken, Turkey)'],
+        foodsToAvoid: ['Sugary Cereals', 'White Rice and Pasta', 'Sweetened Yogurt', 'Fruit Juices', 'Packaged Snack Foods'],
+        samplePlan: {
+            Monday: { Breakfast: 'Scrambled eggs with spinach', Lunch: 'Turkey and vegetable wrap', Dinner: 'Grilled fish with steamed broccoli' },
+            Tuesday: { Breakfast: 'Greek yogurt with a few berries', Lunch: 'Black bean salad', Dinner: 'Chicken stir-fry with brown rice' },
+            Wednesday: { Breakfast: 'Oatmeal with cinnamon', Lunch: 'Leftover stir-fry', Dinner: 'Lentil and vegetable stew' }
+        }
+      },
+      'Migraine': {
+        description: 'Certain foods can trigger migraines. Common triggers include aged cheeses, alcohol, and processed foods. Staying hydrated is crucial.',
+        foodsToEat: ['Fresh fruits and vegetables', 'Brown rice', 'Fresh fish and poultry', 'Water', 'Cooked grains like quinoa'],
+        foodsToAvoid: ['Aged cheeses (Cheddar, Blue cheese)', 'Alcohol (especially red wine)', 'Chocolate', 'Processed meats (with nitrates)', 'Caffeine (in excess or withdrawal)'],
+        samplePlan: {}
+      },
+      'Asthma': {
+        description: 'An anti-inflammatory diet rich in antioxidants may help manage asthma symptoms. Vitamin D and magnesium are also important.',
+        foodsToEat: ['Apples and Bananas', 'Fatty fish (Salmon)', 'Ginger, Turmeric, Garlic', 'Spinach and other leafy greens', 'Foods rich in Vitamin D (fortified milk, eggs)'],
+        foodsToAvoid: ['Sulfites (found in dried fruit, wine)', 'Gas-producing foods (beans, cabbage)', 'Salicylates (in some teas, coffees, spices)', 'Fast food (high in saturated fat)'],
+        samplePlan: {}
+      }
+    };
+
+    const SYMPTOM_REGIONS = {
+      'Head': ['Headache', 'Dizziness', 'Runny Nose', 'Sore Throat', 'Sneezing', 'Throat Irritation', 'Eye Pain', 'Ear Pain', 'Memory Loss', 'Confusion', 'Hair Loss', 'Cough'],
+      'Chest': ['Chest Pain', 'Shortness of Breath', 'Cough'],
+      'Abdomen': ['Nausea', 'Abdominal Pain', 'Loss of Appetite'],
+      'Limbs': ['Joint Pain', 'Muscle Pain', 'Tremors', 'Weakness', 'Back Pain'],
+      'General': ['Fever', 'Fatigue', 'Rash', 'Body Ache', 'Sweating', 'Chills', 'Itching', 'Weight Loss']
+    };
+
+    // reviews keyed by docId -> array of {user, rating, comment, approved}
+    const REVIEWS = load('mi_reviews') || {};
+
+    // Health Tracker Storage
+    let healthTracker = load('mi_health_tracker') || {steps: 0, water: 0, sleep: 0, exercise: 0, lastUpdate: new Date().toDateString()};
+
+    // Helpers
+    function el(html){ const div=document.createElement('div'); div.innerHTML=html.trim(); return div.firstChild }
+    function save(key,val){ localStorage.setItem(key, JSON.stringify(val)) }
+    function load(key){ const v=localStorage.getItem(key); return v?JSON.parse(v):null }
+
+    // toast notifications
+    function showToast(msg,type='info',duration=3000){
+      let container = document.querySelector('.toast-container');
+      if(!container){ container=document.createElement('div'); container.className='toast-container'; document.body.appendChild(container); }
+      const t=document.createElement('div'); t.className='toast toast-'+type; t.textContent=msg;
+      container.appendChild(t);
+      setTimeout(()=>{ t.style.opacity=0; t.addEventListener('transitionend',()=>t.remove()); }, duration);
+    }
+
+    // calendar export: generate ICS file for appointment
+    function exportToCalendar(appt){
+      const dt = appt.date.split('-').join('');
+      const start = `${dt}T${appt.time.replace(':','').replace(' ','')}`; // simplistic
+      const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Appointment with ${appt.doc.name}\nDTSTART:${start}\nEND:VEVENT\nEND:VCALENDAR`;
+      const blob = new Blob([ics],{type:'text/calendar'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='appointment.ics'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Users stored as array of {name,dob,email,phone,gender,password}
+    const users = load('mi_users') || [];
+    let currentUser = load('mi_session') || null;
+    let lastAnalysis = load('mi_last_analysis') || null;
+    let appointments = load('mi_appts') || [];
+    let medications = load('mi_meds') || [];
+    let medCheckInterval = null;
+
+    function renderLanding(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Medical Intelligence Diagnosis</h1>
+            <p class="lead">AI-assisted symptom analysis • 3D UI • Book doctors • Free demo</p>
+          </div>
+        </header>
+        <div class="row">
+          <div class="col">
+            <div class="card">
+              <h3>Welcome</h3>
+              <p class="muted">Use the system to analyze symptoms and book specialist appointments.</p>
+              <div style="margin-top:12px;display:flex;gap:10px">
+                <button class="btn btn-primary" id="btn-register">Register</button>
+                <button class="btn btn-ghost" id="btn-login">Login</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card">
+              <h3>How it works</h3>
+              <ol class="muted" style="padding-left:18px">
+                <li>Register an account</li>
+                <li>Describe your symptoms</li>
+                <li>AI analyzes and shows possible diseases</li>
+                <li>Book a doctor & view dashboard</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <footer> Data stored locally in your browser.</footer>
+      `;
+      document.getElementById('btn-register').onclick = renderRegister;
+      document.getElementById('btn-login').onclick = renderLogin;
+    }
+
+    function renderRegister(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Create Account</h1>
+            <p class="lead">All fields validated. DOB cannot be in the future.</p>
+          </div>
+        </header>
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label>Name</label>
+              <input class="input" id="r_name" />
+            </div>
+            <div>
+              <label>DOB</label>
+              <input type="date" class="input" id="r_dob" />
+            </div>
+            <div>
+              <label>Email</label>
+              <input type="email" class="input" id="r_email" placeholder="name@example.com" />
+            </div>
+            <div>
+              <label>Phone</label>
+              <input class="input" id="r_phone" inputmode="numeric" pattern="[0-9]*" maxlength="15" placeholder="Numbers only" />
+            </div>
+            <div>
+              <label>Gender</label>
+              <select class="input" id="r_gender">
+                <option value="">Select gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+            <div>
+              <label>Password</label>
+              <input type="password" class="input" id="r_pass" />
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" id="r_submit">Submit</button>
+                <button class="btn btn-ghost" id="r_cancel">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div id="r_msg" class="muted" style="margin-top:8px"></div>
+        </div>
+      `;
+
+      // prevent future date
+      const dob = document.getElementById('r_dob');
+      const today = new Date().toISOString().split('T')[0];
+      dob.setAttribute('max', today);
+
+      // keep phone field numeric-only while typing
+      const phoneInput = document.getElementById('r_phone');
+      phoneInput.oninput = () => {
+        phoneInput.value = phoneInput.value.replace(/\D/g, '');
+      };
+
+  document.getElementById('r_submit').onclick = () => {
+    const name = document.getElementById('r_name').value.trim();
+    const dobv = document.getElementById('r_dob').value;
+    const email = document.getElementById('r_email').value.trim();
+    const phone = document.getElementById('r_phone').value.trim();
+    const gender = document.getElementById('r_gender').value;
+    const pass = document.getElementById('r_pass').value;
+    const msg = document.getElementById('r_msg');
+    msg.textContent = '';
+
+    if(!name || !dobv || !email || !phone || !gender || !pass){
+        msg.textContent = 'Please fill all fields.';
+        return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if(!emailPattern.test(email)){
+      msg.textContent = 'Please enter a valid email address.';
+      return;
+    }
+
+    if(!/^\d+$/.test(phone)){
+      msg.textContent = 'Phone number must contain numbers only.';
+      return;
+    }
+
+    const alreadyExists = users.some(u => (u.email || '').toLowerCase() === email.toLowerCase());
+    if(alreadyExists){
+      msg.textContent = 'An account with this email already exists.';
+      return;
+    }
+
+    users.push({name, dob: dobv, email, phone, gender, password: pass, verified: false});
+    save('mi_users', users);
+
+    msg.style.color = 'green';
+    msg.textContent = 'Registration successful. Please login.';
+    setTimeout(renderLogin, 900);
+};
+
+
+      document.getElementById('r_cancel').onclick = renderLanding;
+    }
+
+    function renderLogin(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Login</h1>
+            <p class="lead">Please login with your registered email and password.</p>
+          </div>
+        </header>
+        <div class="card">
+          <div style="max-width:420px">
+            <label>Email</label>
+            <input type="email" class="input" id="l_email" placeholder="name@example.com" />
+            <label style="margin-top:8px">Password</label>
+            <input type="password" class="input" id="l_pass" />
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary" id="l_submit">Login</button>
+              <button class="btn btn-ghost" id="l_back">Back</button>
+            </div>
+            <div id="l_msg" class="muted" style="margin-top:10px"></div>
+          </div>
+        </div>
+      `;
+      document.getElementById('l_back').onclick = renderLanding;
+
+    document.getElementById('l_submit').onclick = () => {
+    const email = document.getElementById('l_email').value.trim();
+    const pass = document.getElementById('l_pass').value;
+    const msg = document.getElementById('l_msg');
+    msg.textContent = '';
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if(!emailPattern.test(email)){
+      msg.textContent = 'Please enter a valid email address.';
+      return;
+    }
+
+    const found = users.find(u => (u.email || '').toLowerCase() === email.toLowerCase());
+    if(!found){
+      msg.textContent = 'No account found with this email.';
+      return;
+    }
+
+    if(found.password !== pass){
+      msg.textContent = 'Invalid password.';
+      return;
+    }
+
+    currentUser = {...found};
+    save('mi_session', currentUser);
+    renderSymptoms();
+};
+
+      
+    }
+
+    function renderSymptoms(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Symptom Diagnosis</h1>
+            <p class="lead">Select symptoms, set severity and describe details. AI analyzes all inputs.</p>
+          </div>
+        </header>
+        <div class="card">
+          <div style="display:flex;gap:18px;flex-direction:column">
+            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom: 8px;">
+              <div style="flex:1; min-width:180px; max-width:240px; text-align:center; background:var(--glass); border-radius:16px; padding:16px; border:1px solid rgba(0,0,0,0.05); box-shadow:inset 0 2px 10px rgba(0,0,0,0.02)">
+                 <h4 style="margin:0 0 4px 0">Interactive Body Map</h4>
+                 <p class="muted" style="font-size:11px;margin:0 0 10px 0">Click to filter symptoms</p>
+                 <svg viewBox="0 0 100 220" width="100%" height="220" style="max-height:220px; cursor:pointer;" id="body_map_svg">
+                    <style>
+                      .body-part { fill: var(--accent-soft); stroke: rgba(255,255,255,0.8); stroke-width: 2px; transition: all 0.2s; }
+                      .body-part:hover { fill: var(--accent); filter: drop-shadow(0 0 4px rgba(26,179,184,0.5)); }
+                      .body-part.active { fill: var(--accent-blue); stroke: #fff; stroke-width: 2.5px; }
+                    </style>
+                    <circle cx="50" cy="25" r="14" class="body-part" data-part="Head" />
+                    <path d="M35,42 Q50,42 65,42 L62,85 L38,85 Z" class="body-part" data-part="Chest" />
+                    <path d="M38,85 L62,85 L60,115 L40,115 Z" class="body-part" data-part="Abdomen" />
+                    <path d="M33,42 L18,85 L15,115 L22,115 L25,85 L35,50 Z" class="body-part" data-part="Limbs" />
+                    <path d="M67,42 L82,85 L85,115 L78,115 L75,85 L65,50 Z" class="body-part" data-part="Limbs" />
+                    <path d="M40,115 L48,115 L48,160 L45,210 L35,210 L38,160 Z" class="body-part" data-part="Limbs" />
+                    <path d="M60,115 L52,115 L52,160 L55,210 L65,210 L62,160 Z" class="body-part" data-part="Limbs" />
+                 </svg>
+                 <div style="margin-top:10px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap">
+                   <button class="btn btn-ghost" style="font-size:11px; padding:4px 8px" id="btn_gen_sym">General</button>
+                   <button class="btn btn-primary" style="font-size:11px; padding:4px 8px" id="btn_all_sym">Show All</button>
+                 </div>
+              </div>
+              <div style="flex:3; min-width:300px; display:flex; flex-direction:column;">
+                <label style="margin-bottom:12px; font-size:14px;">Select Symptoms <strong id="current_region_lbl" style="color:var(--accent)">— All</strong></label>
+                <div class="sym-list" id="sym_list" style="max-height:280px; overflow-y:auto; padding-right:8px; align-content:flex-start"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center; border-top:1px solid rgba(0,0,0,0.05); padding-top:16px;">
+              <div style="flex:1">
+                <label>Severity</label>
+                <select id="severity" class="input">
+                  <option>Mild</option>
+                  <option>Moderate</option>
+                  <option>Severe</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label>Duration (Days)</label>
+                <input type="number" id="sym_days" class="input" min="1" value="1" />
+              </div>
+              <div style="flex:2">
+                <label>Describe symptoms</label>
+                <textarea id="sym_text" class="input" rows="3" placeholder="Describe duration, onset, other notes..."></textarea>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-primary" id="analyze">Analyze with AI</button>
+              <button class="btn btn-ghost" id="sym_back">Back</button>
+            </div>
+            <div id="analysis_area"></div>
+          </div>
+        </div>
+      `;
+
+      const symList = document.getElementById('sym_list');
+      SYMPTOMS.forEach(s=>{
+        const id = 'sym_'+s.replace(/\s+/g,'_');
+        const div = document.createElement('div');
+        div.className='sym-item sym-item-wrap';
+        div.dataset.sym = s;
+        div.innerHTML = `<input type="checkbox" id="${id}" value="${s}"><label for="${id}" style="margin:0">${s}</label>`;
+        symList.appendChild(div);
+      });
+
+      function filterSymptoms(region) {
+          document.getElementById('current_region_lbl').textContent = region === 'All' ? '— All' : '— ' + region;
+          const items = document.querySelectorAll('.sym-item-wrap');
+          items.forEach(item => {
+              const s = item.dataset.sym;
+              if (region === 'All') {
+                  item.style.display = 'flex';
+              } else {
+                  item.style.display = SYMPTOM_REGIONS[region] && SYMPTOM_REGIONS[region].includes(s) ? 'flex' : 'none';
+              }
+          });
+          document.querySelectorAll('.body-part').forEach(p => {
+              if (region !== 'All' && region !== 'General' && p.dataset.part === region) p.classList.add('active');
+              else p.classList.remove('active');
+          });
+          
+          const btnAll = document.getElementById('btn_all_sym');
+          const btnGen = document.getElementById('btn_gen_sym');
+          btnAll.className = region === 'All' ? 'btn btn-primary' : 'btn btn-ghost';
+          btnGen.className = region === 'General' ? 'btn btn-primary' : 'btn btn-ghost';
+      }
+
+      document.querySelectorAll('.body-part').forEach(p => {
+          p.onclick = (e) => filterSymptoms(e.target.dataset.part);
+      });
+      document.getElementById('btn_gen_sym').onclick = () => filterSymptoms('General');
+      document.getElementById('btn_all_sym').onclick = () => filterSymptoms('All');
+
+      document.getElementById('sym_back').onclick = ()=>{ renderLanding(); };
+      document.getElementById('analyze').onclick = () => {
+
+    const checked = Array.from(document.querySelectorAll('#sym_list input:checked')).map(i=>i.value);
+    const severity = document.getElementById('severity').value;
+    const days = document.getElementById('sym_days').value;
+    const text = document.getElementById('sym_text').value.trim();
+
+    // ✅ validation
+    if(checked.length === 0 && !text){
+        alert('Please select or describe symptoms');
+        return;
+    }
+
+    // Perform precise local AI analysis based on provided symptoms
+    const analysis = analyzeAll(checked, severity, text, days);
+
+        console.log("Analysis result:", analysis); // debug
+
+        lastAnalysis = {
+            checked,
+            severity,
+            text,
+            days,
+            analysis,
+            timestamp: new Date().toISOString()
+        };
+
+        save('mi_last_analysis', lastAnalysis);
+
+        renderAnalysis(analysis);
+
+};
+};
+
+    function analyzeAll(symptoms,severity,text,days){
+      // Combine symptoms and text factors into a score for each disease
+      const lowerText = text.toLowerCase();
+      const scores = {};
+      Object.keys(DISEASES).forEach(d => scores[d]=0);
+      
+      // Compute scores from checked symptoms precisely
+      symptoms.forEach(s=>{
+        const key = s.toLowerCase();
+        Object.keys(DISEASES).forEach(d=>{ 
+          DISEASES[d].forEach(k=>{ 
+            if(key.includes(k) || k.includes(key)) {
+              scores[d] += 5; // Direct strong match
+            } else if(key.split(' ').some(word => word.length > 4 && k.includes(word))) {
+              scores[d] += 2; // Partial word match
+            }
+          }); 
+        });
+      });
+      
+      // Compute scores from text description
+      Object.keys(DISEASES).forEach(d=>{
+        DISEASES[d].forEach(k=>{ if(lowerText.includes(k)) scores[d]+=3 });
+      });
+
+      // Severity multiplier
+      const severityMul = severity==='Mild'?1:severity==='Moderate'?1.5:2;
+
+      // Days influence only if already matched
+      const dVal = parseInt(days) || 1;
+      if(dVal > 3) {
+        if(scores['Flu'] > 0) scores['Flu'] += 2;
+        if(scores['COVID-19'] > 0) scores['COVID-19'] += 3;
+      }
+      if(dVal > 7) {
+        if(scores['Heart Issue'] > 0) scores['Heart Issue'] += 4;
+        if(scores['Asthma'] > 0) scores['Asthma'] += 3;
+      }
+
+      // Apply severity multiplier
+      Object.keys(scores).forEach(d=>scores[d] = Math.max(0, scores[d] * severityMul));
+      
+      // Normalize to percentages (make it total 100%)
+      const total = Object.values(scores).reduce((a,b)=>a+b,0);
+      const percentages = {};
+      
+      if(total === 0) {
+        // Fallback if no matching symptoms at all
+        Object.keys(scores).forEach(d => percentages[d] = 0);
+        percentages['Common Cold'] = 100;
+        return percentages;
+      }
+
+      Object.keys(scores).forEach(d => percentages[d] = Math.round((scores[d]/total)*100));
+      return percentages;
+    }
+
+    function downloadReport(data){
+      if(!data) return;
+      const date = new Date().toLocaleDateString();
+      let content = `MEDICAL INTELLIGENCE DIAGNOSIS REPORT\nDate: ${date}\n\n`;
+      content += `PATIENT: ${currentUser.name}\nDOB: ${currentUser.dob}\n\n`;
+      content += `SYMPTOMS:\n- ${data.checked.join('\n- ')}\n`;
+      content += `Severity: ${data.severity}\nDuration: ${data.days||1} days\n`;
+      content += `Notes: ${data.text}\n\n`;
+      content += `AI ANALYSIS RESULTS:\n`;
+      Object.keys(data.analysis).sort((a,b)=>data.analysis[b]-data.analysis[a]).forEach(k=>{
+        content += `${k}: ${data.analysis[k]}%\n`;
+      });
+      // add medications for the top prediction
+      const top = Object.keys(data.analysis).sort((a,b)=>data.analysis[b]-data.analysis[a])[0];
+      if(top && MEDICINES[top] && MEDICINES[top].length){
+        content += `\nRecommended medicines for ${top}:\n`;
+        MEDICINES[top].forEach(m=>{ content += `- ${m}\n`; });
+      }
+      content += `\nDISCLAIMER: This is an AI-generated report for informational purposes only. Consult a doctor for medical advice.`;
+      
+      const blob = new Blob([content], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MI_Report_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderAnalysis(analysis){
+      const area = document.getElementById('analysis_area');
+      area.innerHTML = '';
+      const card = document.createElement('div'); card.className='card';
+      const keys = Object.keys(analysis).sort((a,b)=>analysis[b]-analysis[a]);
+
+      // Bars
+      const barsWrap = document.createElement('div'); barsWrap.className='card';
+      barsWrap.innerHTML = `<h3>AI Prediction</h3><div class="bars" id="bars"></div>`;
+      const bars = barsWrap.querySelector('#bars');
+      keys.forEach((k, idx)=>{
+        const v = analysis[k];
+        const bar = document.createElement('div'); bar.className='bar';
+        bar.innerHTML = `<div style="height:100%;width:100%;display:flex;align-items:end"><div class="bar-inner" style="height:0%"></div></div><div class="bar-label">${k}<div style="font-size:12px;color:var(--muted)">${v}%</div></div>`;
+        bars.appendChild(bar);
+        setTimeout(()=>{ bar.querySelector('.bar-inner').style.height = v+'%'; }, 100 + (idx * 50));
+      });
+
+      // Prevention & medicine cards
+      const prevent = document.createElement('div'); prevent.className='card';
+      prevent.innerHTML = `<h3>Prevention, Care & Medicines</h3><div style="display:flex;gap:10px;flex-wrap:wrap" id="p_list"></div>`;
+      const pList = prevent.querySelector('#p_list');
+      
+      // Show prevention and medicine info for predicted diseases (score > 0)
+      const predicted = keys.filter(k => analysis[k] > 0);
+      (predicted.length ? predicted : keys.slice(0,3)).forEach(k=>{
+        const methods = PREVENTIONS[k] || ['Consult doctor', 'Rest', 'Monitor symptoms'];
+        const meds = MEDICINES[k] || [];
+        const p = document.createElement('div'); p.className='card'; p.style.minWidth='220px';
+        let sideEffectsHtml = '';
+        if(meds.length) {
+          sideEffectsHtml = '<p class="muted" style="margin-top:8px"><strong>Side Effects Info:</strong></p><div class="muted" style="padding-left:18px;margin-top:6px;font-size:12px">';
+          meds.forEach(med => {
+            const effects = SIDE_EFFECTS[med] || [];
+            if(effects.length) {
+              sideEffectsHtml += `<div style="margin-bottom:6px"><strong>${med}:</strong> ${effects.join(', ')}</div>`;
+            }
+          });
+          sideEffectsHtml += '</div>';
+        }
+        p.innerHTML = `<h4>${k}</h4>
+          <p class="muted">Suggested prevention & care methods:</p>
+          <ul class="muted" style="padding-left:18px;margin-top:6px">${methods.map(m=>`<li>${m}</li>`).join('')}</ul>` +
+          (meds.length ? `<p class="muted" style="margin-top:8px">Common medicines:</p>
+          <ul class="muted" style="padding-left:18px;margin-top:6px">${meds.map(m=>`<li>${m}</li>`).join('')}</ul>` : '') + sideEffectsHtml;
+        pList.appendChild(p);
+      });
+
+      // Recommended Tests
+      const testsDiv = document.createElement('div'); testsDiv.className='card';
+      testsDiv.innerHTML = `<h3>🧬 Recommended Medical Tests</h3><div style="display:flex;gap:10px;flex-wrap:wrap" id="t_list"></div>`;
+      const tList = testsDiv.querySelector('#t_list');
+      (predicted.length ? predicted : keys.slice(0,3)).forEach(k=>{
+        const tests = TEST_RECOMMENDATIONS[k] || ['Consult doctor for advised tests'];
+        const t = document.createElement('div'); t.className='card'; t.style.minWidth='200px'; t.style.background='linear-gradient(200deg,rgba(56,189,248,0.1),rgba(96,165,250,0.05))';
+        t.innerHTML = `<h4>${k}</h4><ul class="muted" style="padding-left:18px;margin:8px 0;font-size:12px">${tests.map(test=>`<li>${test}</li>`).join('')}</ul>`;
+        tList.appendChild(t);
+      });
+
+      // Next button
+      const nextWrap = document.createElement('div'); nextWrap.style.marginTop='12px';
+      nextWrap.innerHTML = `<button class="btn btn-primary" id="to_appt">Next: Book Doctor</button> <button class="btn btn-ghost" id="dl_report">Download Report</button> <button class="btn btn-ghost" id="to_sym">Back</button>`;
+
+      area.appendChild(barsWrap);
+      area.appendChild(prevent);
+      area.appendChild(testsDiv);
+      area.appendChild(nextWrap);
+
+      document.getElementById('dl_report').onclick = () => downloadReport(lastAnalysis);
+      document.getElementById('to_appt').onclick = renderDoctors;
+      document.getElementById('to_sym').onclick = renderSymptoms;
+    }
+
+    function renderDoctors(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Select Doctor & Book</h1>
+            <p class="lead">Choose a specialist and pick date/time for your appointment.</p>
+          </div>
+        </header>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+              <h3 style="margin:0">1. Select Specialist</h3>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <input id="doc_search" class="input" placeholder="🔍 Search doctors..." style="width:200px;padding:8px 12px" />
+                <select id="doc_filter" class="input" style="width:auto;padding:8px 12px"><option value="All">All Specialties</option></select>
+                <select id="doc_sort" class="input" style="width:auto;padding:8px 12px">
+                  <option value="">Sort by</option>
+                  <option value="rating">Rating</option>
+                  <option value="exp">Experience</option>
+                  <option value="name">Name</option>
+                </select>
+              </div>
+            </div>
+            <div class="doc-grid" id="doc_grid" style="max-height:420px;overflow-y:auto;padding:4px"></div>
+          </div>
+
+          <div class="card" id="booking_section" style="opacity:0.5; pointer-events:none; transition: opacity 0.3s">
+            <h3 style="margin:0 0 12px 0">2. Select Date & Time</h3>
+            <div id="selected_doc_display" style="margin-bottom:16px;color:var(--accent);font-weight:600;font-size:15px">No doctor selected</div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap">
+              <div style="flex:1;min-width:260px">
+                <label>Select Date</label>
+                <input type="date" class="input" id="appt_date" style="margin-bottom:10px" />
+                <div id="quick_calendar" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+              </div>
+              <div style="flex:2;min-width:300px">
+                <label>Available Time Slots</label>
+                <div id="time_slots" style="display:flex;gap:10px;flex-wrap:wrap;padding:16px;background:rgba(255,255,255,0.6);border-radius:14px;min-height:80px;align-items:center;border:1px solid rgba(0,0,0,0.05)">
+                  <span class="muted">Select a date to view available slots.</span>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:20px;display:flex;gap:10px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.05)">
+              <button class="btn btn-primary" id="confirm_appt">Confirm Appointment</button>
+              <button class="btn btn-ghost" id="doc_back">Back</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Populate filter
+      const filter = document.getElementById('doc_filter');
+      const specs = [...new Set(DOC_PROFILES.map(d=>d.spec))];
+      specs.forEach(s=>{ const o=document.createElement('option'); o.textContent=s; filter.appendChild(o); });
+
+      const grid = document.getElementById('doc_grid');
+      
+      function renderGrid(filterVal, searchTerm='', sortKey=''){
+        grid.innerHTML = '';
+        let list = filterVal==='All' ? DOC_PROFILES.slice() : DOC_PROFILES.filter(d=>d.spec===filterVal);
+        if(searchTerm){
+            const term = searchTerm.toLowerCase();
+            list = list.filter(d=>d.name.toLowerCase().includes(term) || d.spec.toLowerCase().includes(term));
+        }
+        if(sortKey){
+            list.sort((a,b)=>{
+                if(sortKey==='name') return a.name.localeCompare(b.name);
+                return b[sortKey] - a[sortKey];
+            });
+        }
+        if(list.length===0) grid.innerHTML = '<div class="muted">No doctors found for this specialty.</div>';
+        
+        list.forEach(d=>{
+          const node = document.createElement('div'); node.className='doc-card'; node.dataset.docid=d.id;
+          const reviews = REVIEWS[d.id] || [];
+          const reviewLabel = reviews.length ? `(${reviews.length})` : '';
+          node.innerHTML = `
+            <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+              <div class="avatar" style="width:55px;height:55px;font-size:18px">${d.avatar}</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between;align-items:center"><strong style="font-size:15px">${d.name}</strong> <span style="color:#f59e0b;font-weight:700;font-size:13px">★ ${d.rating}</span></div>
+                <div class="muted" style="font-size:12px;margin-top:2px">${d.spec}</div>
+                <div class="muted" style="font-size:11px;margin-top:2px">${d.exp} yrs exp ${reviewLabel}</div>
+              </div>
+            </div>
+            <button class="btn btn-ghost" style="width:100%;font-size:12px;padding:6px;border-radius:8px" onclick="event.stopPropagation(); showDoctorDetails(${d.id})">👁️ View Profile</button>`;
+          node.onclick = ()=>{
+            // add selection flag
+            document.querySelectorAll('.doc-card').forEach(c=>c.style.outline='');
+            node.style.outline='3px solid var(--accent)';
+            
+            const bSec = document.getElementById('booking_section');
+            bSec.style.opacity = '1'; bSec.style.pointerEvents = 'auto';
+            document.getElementById('selected_doc_display').innerHTML = `Selected: <strong>${d.name}</strong> (${d.spec})`;
+            
+            // store selection
+            grid.dataset.selected = JSON.stringify(d);
+            if(document.getElementById('appt_date').value) document.getElementById('appt_date').dispatchEvent(new Event('change'));
+          };
+          grid.appendChild(node);
+        });
+      }
+      renderGrid('All');
+      filter.onchange = () => renderGrid(filter.value, document.getElementById('doc_search').value, document.getElementById('doc_sort').value);
+      document.getElementById('doc_search').oninput = (e) => renderGrid(filter.value, e.target.value, document.getElementById('doc_sort').value);
+      document.getElementById('doc_sort').onchange = (e) => renderGrid(filter.value, document.getElementById('doc_search').value, e.target.value);
+
+      // min date today
+      const dt = document.getElementById('appt_date'); 
+      const today = new Date().toISOString().split('T')[0]; 
+      dt.setAttribute('min', today);
+      
+      // availability calendar (next 7 days)
+      const calDiv = document.getElementById('quick_calendar');
+      function renderCalendar(){
+          calDiv.innerHTML='';
+          for(let i=0;i<7;i++){
+              const d=new Date(); d.setDate(d.getDate()+i);
+              const val = d.toISOString().split('T')[0];
+              const btn=document.createElement('button'); btn.className='btn btn-ghost';
+              btn.style.fontSize='11px'; btn.style.padding='6px 10px'; btn.style.borderRadius='20px';
+              btn.textContent = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+              btn.onclick = ()=>{ dt.value=val; dt.dispatchEvent(new Event('change')); };
+              calDiv.appendChild(btn);
+          }
+      }
+      renderCalendar();
+      
+      let selectedTime = null;
+      const slotsDiv = document.getElementById('time_slots');
+
+      dt.onchange = () => {
+        slotsDiv.innerHTML = '';
+        selectedTime = null;
+        if(!dt.value) {
+            slotsDiv.innerHTML = '<span class="muted">Select a date to view available slots.</span>';
+            return;
+        }
+
+        // Determine base slots — prefer doctor-specific availability when a doctor selected
+        let baseSlots = ['09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM', '05:00 PM'];
+        const sel = grid.dataset.selected ? JSON.parse(grid.dataset.selected) : null;
+        if(sel && sel.availability && Array.isArray(sel.availability)) baseSlots = sel.availability;
+
+        // Exclude slots already booked for this doctor on selected date
+        const booked = appointments.filter(a=>a.doc && dt.value && a.doc.id=== (sel?sel.id:null) && a.date===dt.value).map(a=>a.time);
+
+        // Filter out booked slots
+        let available = baseSlots.filter(s => !booked.includes(s));
+
+        // Filter if today: remove slots earlier than now
+        const isToday = dt.value === today;
+        const now = new Date();
+        const validSlots = available.filter(s => {
+          if(!isToday) return true;
+          let [t, mod] = s.split(' ');
+          let [h, m] = t.split(':').map(Number);
+          if(mod==='PM' && h!==12) h+=12;
+          if(mod==='AM' && h===12) h=0;
+          const slotDate = new Date();
+          slotDate.setHours(h,m,0,0);
+          return slotDate > now;
+        });
+
+        if(validSlots.length === 0) {
+          slotsDiv.innerHTML = '<span class="muted">No slots available for this date.</span>';
+          return;
+        }
+
+        validSlots.forEach(time => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-ghost';
+            btn.textContent = time;
+            btn.style.fontSize = '13px';
+            btn.onclick = () => {
+                Array.from(slotsDiv.children).forEach(c => {
+                    c.classList.remove('btn-primary');
+                    c.classList.add('btn-ghost');
+                    c.style.color = '';
+                });
+                btn.classList.remove('btn-ghost');
+                btn.classList.add('btn-primary');
+                selectedTime = time;
+            };
+            slotsDiv.appendChild(btn);
+        });
+      };
+
+      document.getElementById('doc_back').onclick = renderAnalysisFromStorage;
+      document.getElementById('confirm_appt').onclick = ()=>{
+        const sel = grid.dataset.selected; if(!sel){ alert('Please select a doctor.'); return }
+        const doc = JSON.parse(sel);
+        const date = document.getElementById('appt_date').value;
+        
+        if(!date){ alert('Please choose a date.'); return }
+        if(!selectedTime){ alert('Please select a time slot.'); return }
+        
+        // save appointment
+        const ap = {id:Date.now(), user:currentUser.email, doc, date, time: selectedTime, analysis:lastAnalysis};
+        appointments.push(ap); save('mi_appts',appointments);
+        // visual feedback
+        showToast('Appointment booked successfully','success');
+        // success modal
+        showSuccess(ap);
+      };
+    }
+
+    function renderAnalysisFromStorage(){
+      // recreate analysis view if lastAnalysis exists
+      if(!lastAnalysis){ renderSymptoms(); return }
+      renderSymptoms(); // will show analysis area empty; so inject analysis
+      setTimeout(()=>{ renderAnalysis(lastAnalysis.analysis); }, 100);
+    }
+
+    function showDoctorDetails(docId){
+      const doc = DOC_PROFILES.find(d=>d.id===docId);
+      if(!doc) return;
+
+      const modal = document.createElement('div'); modal.className='modal'; modal.style.zIndex='10000';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width:500px;width:90%;max-height:80vh;overflow-y:auto">
+          <div style="display:flex;gap:12px;padding:20px;border-bottom:1px solid rgba(255,255,255,0.1);align-items:center">
+            <div class="avatar" style="width:60px;height:60px;font-size:24px;display:flex;align-items:center;justify-content:center">${doc.avatar}</div>
+            <div>
+              <h2 style="margin:0">${doc.name}</h2>
+              <p style="margin:0;color:rgba(255,255,255,0.6)">${doc.spec} • ${doc.exp} years experience</p>
+              <p style="margin:0;color:#2dd4bf">Rating: ${doc.rating}★</p>
+            </div>
+          </div>
+          <div style="padding:20px">
+            <h3 style="margin:0 0 8px 0">About</h3>
+            <p style="margin:0 0 16px 0;color:rgba(255,255,255,0.7)">${doc.bio}</p>
+            
+            <h3 style="margin:0 0 8px 0">Achievements & Qualifications</h3>
+            <ul style="list-style:none;padding:0;margin:0 0 16px 0">
+              ${doc.achievements.map(a=>`<li style="padding:8px 0;padding-left:24px;border-bottom:1px solid rgba(255,255,255,0.05);position:relative"><span style="position:absolute;left:0;color:#2dd4bf">✓</span>${a}</li>`).join('')}
+            </ul>
+
+            <div style="margin-top:12px">
+              <h3 style="margin:0 0 8px 0">Patient Reviews</h3>
+              <div id="reviews_list" style="max-height:160px;overflow:auto;margin-bottom:8px">
+                ${ (REVIEWS[docId]||[]).filter(r=>r.approved).map(r=>`<div style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.04)"><strong style="display:block">${r.rating}★ — ${r.user}</strong><div style="font-size:13px;color:rgba(255,255,255,0.7)">${r.comment}</div></div>`).join('') }
+                ${ ((REVIEWS[docId]||[]).filter(r=>!r.approved).length>0? '<div class="muted" style="font-size:12px">Some reviews pending moderation.</div>' : '') }
+              </div>
+
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" style="flex:1" onclick="document.querySelector('.modal').remove(); setTimeout(()=>{ const grid = document.getElementById('doc_grid'); if(grid){ Array.from(grid.parentNode.children).forEach(n=>{ if(n.id==='selected_doc') n.remove(); }); const node = Array.from(grid.children).find(c=>c.dataset.docid===${docId}); if(node){ node.onclick.call(node); } }}, 10)">Select This Doctor</button>
+                <button class="btn btn-ghost" onclick="document.querySelector('.modal').remove()">Close</button>
+              </div>
+              
+              ${ currentUser && currentUser.email==='admin@admin.com' ? `<div style="margin-top:10px"><button class="btn btn-ghost" id="mod_reviews_${docId}">Moderate Reviews</button></div>` : '' }
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+
+      // wire moderation button for admin
+      const modBtn = document.getElementById(`mod_reviews_${docId}`);
+      if(modBtn){ modBtn.onclick = ()=>{
+        const pending = (REVIEWS[docId]||[]).filter(r=>!r.approved);
+        if(pending.length===0){ alert('No pending reviews'); return; }
+        // simple modal to approve each
+        let i=0;
+        function showOne(){
+          const pr = pending[i];
+          const mm = document.createElement('div'); mm.className='modal'; mm.innerHTML = `<div class="modal-card card" style="text-align:left;max-width:480px"><h3>Moderate Review</h3><div style="margin-top:8px"><strong>${pr.user}</strong> — ${pr.rating}★</div><p style="margin-top:8px">${pr.comment}</p><div style="margin-top:12px"><button class="btn btn-primary" id="ap_${i}">Approve</button> <button class="btn btn-ghost" id="rej_${i}">Reject</button></div></div>`;
+          document.body.appendChild(mm);
+          document.getElementById(`ap_${i}`).onclick = ()=>{ pr.approved=true; save('mi_reviews', REVIEWS); mm.remove(); i++; if(i<pending.length) showOne(); else { alert('Moderation complete'); renderDashboard(); modal.remove(); } };
+          document.getElementById(`rej_${i}`).onclick = ()=>{ const idx = REVIEWS[docId].indexOf(pr); if(idx!==-1) REVIEWS[docId].splice(idx,1); save('mi_reviews', REVIEWS); mm.remove(); i++; if(i<pending.length) showOne(); else { alert('Moderation complete'); renderDashboard(); modal.remove(); } };
+        }
+        showOne();
+      }}
+    }
+
+    function showSuccess(appt){
+      // success popup with Dashboard button
+      const modal = document.createElement('div'); modal.className='modal';
+      modal.innerHTML = `<div class="modal-card card"><h2>Appointment successfully booked!</h2><p class="muted">${appt.doc.name} on ${appt.date} at ${appt.time}</p><div style="margin-top:12px"><button class="btn btn-primary" id="goto_dash">Go to Dashboard</button> <button class="btn btn-ghost" id="close_modal">Close</button></div></div>`;
+      document.body.appendChild(modal);
+      document.getElementById('close_modal').onclick = ()=>{ modal.remove(); renderLanding(); };
+      document.getElementById('goto_dash').onclick = ()=>{ modal.remove(); renderDashboard(); };
+    }
+
+    function showApptDetails(appt){
+      const modal = document.createElement('div'); modal.className='modal';
+      const an = appt.analysis;
+      const symptoms = an ? an.checked.join(', ') : 'None recorded';
+      const topDiag = an ? Object.keys(an.analysis).sort((a,b)=>an.analysis[b]-an.analysis[a])[0] : 'N/A';
+      
+      modal.innerHTML = `
+        <div class="modal-card card" style="text-align:left;max-width:500px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0">Appointment Details</h3>
+            <button class="btn btn-ghost" id="close_d_modal" style="padding:4px 10px">✕</button>
+          </div>
+          <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid rgba(0,0,0,0.05)">
+            <div class="avatar">${appt.doc.avatar}</div>
+            <div><div style="font-weight:700;font-size:18px">${appt.doc.name}</div><div class="muted">${appt.doc.spec}</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="input" style="background:rgba(255,255,255,0.6)"><div class="muted">Date</div><strong>${appt.date}</strong></div>
+            <div class="input" style="background:rgba(255,255,255,0.6)"><div class="muted">Time</div><strong>${appt.time}</strong></div>
+          </div>
+          <div class="card" style="padding:12px;background:rgba(255,255,255,0.5)">
+            <div class="muted">Reported Symptoms</div><div style="margin-bottom:8px">${symptoms}</div>
+            <div class="muted">AI Primary Indication</div><div>${topDiag}</div>
+          </div>
+          <div style="margin-top:16px">
+            <h4 style="margin:0 0 6px 0">Leave a Review</h4>
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+              <label style="font-size:13px">Rating:</label>
+              <select id="review_rating" class="input" style="width:80px">
+                <option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+              </select>
+            </div>
+            <textarea id="review_comment" class="input" placeholder="Write your feedback..." style="height:60px"></textarea>
+            <button class="btn btn-primary" id="submit_review" style="margin-top:8px;font-size:13px">Submit Review</button>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn btn-ghost" id="export_cal_btn">📅 Export to Calendar</button>
+            <button class="btn btn-primary" id="close_d_modal_btn">Close</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      document.getElementById('close_d_modal_btn').onclick = () => modal.remove();
+      document.getElementById('export_cal_btn').onclick = ()=>{
+          exportToCalendar(appt);
+          showToast('Calendar file downloaded','success');
+      };
+        document.getElementById('submit_review').onclick = ()=>{
+          const rating = parseInt(document.getElementById('review_rating').value);
+          const comment = document.getElementById('review_comment').value.trim();
+          if(!comment){ alert('Please write a comment'); return; }
+          const rid = appt.doc.id;
+          if(!REVIEWS[rid]) REVIEWS[rid]=[];
+          // mark as pending moderation
+          REVIEWS[rid].push({user: currentUser.email, rating, comment, approved:false});
+          save('mi_reviews', REVIEWS);
+          showToast('Review submitted for moderation','info');
+          modal.remove();
+        };
+    }
+
+    function renderDashboard(){
+      // ensure we always show the freshest AI prediction chart
+      lastAnalysis = load('mi_last_analysis') || lastAnalysis;
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Patient Dashboard</h1>
+            <p class="lead">Overview of your health analysis & upcoming appointments.</p>
+          </div>
+        </header>
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <button class="btn btn-primary" id="btn_health_track" style="padding:8px 14px;font-size:13px">📊 Health Tracker</button>
+          <button class="btn btn-primary" id="btn_tests" style="padding:8px 14px;font-size:13px">🧪 Medical Tests</button>
+          <button class="btn btn-primary" id="btn_diet_planner" style="padding:8px 14px;font-size:13px;background:var(--accent-soft)">🥗 Diet Planner</button>
+          <button class="btn btn-primary" id="btn_medications" style="padding:8px 14px;font-size:13px;background:var(--accent-blue)">💊 Medications</button>
+          <button class="btn btn-primary" id="btn_emergency" style="padding:8px 14px;font-size:13px;background:rgba(225,29,72,0.8)">🚨 Emergency</button>
+        </div>
+        <div class="card">
+          <div style="display:flex;gap:18px;align-items:flex-start">
+            <div style="flex:1">
+              <h3>Profile</h3>
+              <div class="card" style="padding:12px">
+                <div style="display:flex;gap:10px;align-items:center">
+                  <div style="width:60px;height:60px;border-radius:8px;overflow:hidden">
+                    ${currentUser.picture?`<img src="${currentUser.picture}" style="width:100%;height:100%;object-fit:cover" />`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--accent-blue),var(--accent));color:#f0ffff;font-weight:700">${(currentUser.name||'U').split(' ').map(s=>s[0]).slice(0,2).join('')}</div>`}
+                  </div>
+                  <div style="flex:1">
+                    <strong>${currentUser.name}</strong>
+                    <div class="muted">DOB: ${currentUser.dob}</div>
+                    <div class="muted">Email: ${currentUser.email}</div>
+                    <div class="muted">Phone: ${currentUser.phone}</div>
+                    <div class="muted">Gender: ${currentUser.gender || 'Not specified'}</div>
+                    <div style="margin-top:6px;font-size:13px">Status: ${currentUser.verified?'<span style="color:#10b981">Verified</span>':'<span style="color:#f59e0b">Not Verified</span> <button class="btn btn-ghost" id="resend_verify" style="padding:4px 8px;font-size:12px;margin-left:6px">Resend</button>'}</div>
+                  </div>
+                </div>
+                <div style="margin-top:8px"><button class="btn btn-ghost" id="edit_profile_btn" style="font-size:12px;padding:4px 10px;">✏️ Edit Profile</button></div>
+              </div>
+              <h3 style="margin-top:12px">Health Severity</h3>
+              <div class="card" style="padding:12px"><div class="muted">Severity Score</div><div style="height:14px;background:rgba(255,255,255,0.04);border-radius:8px;margin-top:8px"><div id="sev_bar" style="height:14px;width:0%;border-radius:8px;background:linear-gradient(90deg,var(--accent),#60a5fa);transition:width 1s cubic-bezier(.2,.9,.3,1)"></div></div></div>
+              <h3 style="margin-top:12px">Today's Medications</h3>
+              <div class="card" style="padding:12px" id="dash_meds"></div>
+            </div>
+            <div style="flex:2">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <h3>Last Analysis</h3>
+                <button id="dash_dl" class="btn btn-ghost" style="font-size:12px;padding:4px 10px">Download</button>
+              </div>
+              <div id="dash_analysis"></div>
+            </div>
+          </div>
+
+          <h3 style="margin-top:12px">Appointments</h3>
+          <div class="appt-list" id="appt_list"></div>
+        </div>
+      `;
+
+      document.getElementById('edit_profile_btn').onclick = renderEditProfile;
+      // ensure profile info refreshed when dashboard loads
+      // (name,dob,email already in template above)
+
+      // fill analysis
+      const dashAnalysis = document.getElementById('dash_analysis');
+      const dlBtn = document.getElementById('dash_dl');
+
+      if(lastAnalysis){
+        dlBtn.onclick = () => downloadReport(lastAnalysis);
+        const an = lastAnalysis.analysis;
+        const keys = Object.keys(an).sort((a,b)=>an[b]-an[a]);
+        
+        // Container for both charts
+        const chartRow = document.createElement('div');
+        chartRow.style.display = 'flex';
+        chartRow.style.flexWrap = 'wrap';
+        chartRow.style.gap = '20px';
+
+        // === appointment history bar chart ===
+        const userAppts = appointments.filter(ap=>ap.user===currentUser.email);
+        if(userAppts.length){
+            const apptCounts = {};
+            userAppts.forEach(ap=>{
+                const m = ap.date.slice(0,7); // YYYY-MM
+                apptCounts[m] = (apptCounts[m]||0)+1;
+            });
+            const months = Object.keys(apptCounts).sort();
+            const histWrap = document.createElement('div');
+            histWrap.style.flex='1';
+            histWrap.style.minWidth='220px';
+            histWrap.innerHTML = '<h4 style="margin:0 0 8px 0">Appointments</h4>';
+            const histBars = document.createElement('div'); histBars.className='bars';
+            months.forEach((m, idx)=>{
+                const v=apptCounts[m];
+                const p = Math.min(100, v*20);
+                const b=document.createElement('div'); b.className='bar';
+                b.innerHTML = `<div style="height:100%;width:100%;display:flex;align-items:end"><div class="bar-inner" style="height:0%"></div></div><div class="bar-label" style="font-size:11px">${m}<div style="font-size:12px;color:var(--muted)">${v}</div></div>`;
+                histBars.appendChild(b);
+                setTimeout(()=>{ b.querySelector('.bar-inner').style.height = p+'%'; }, 100 + (idx * 50));
+            });
+            histWrap.appendChild(histBars);
+            chartRow.appendChild(histWrap);
+        }
+
+        // Bar Chart
+        const barsWrap = document.createElement('div');
+        barsWrap.style.flex = '2';
+        barsWrap.style.minWidth = '300px';
+        const bars = document.createElement('div'); bars.className='bars';
+        keys.forEach((k, idx)=>{ 
+            const v=an[k]; 
+            const b=document.createElement('div'); b.className='bar'; 
+            b.innerHTML=`<div style="height:100%;width:100%;display:flex;align-items:end"><div class="bar-inner" style="height:0%"></div></div><div class="bar-label">${k}<div style="font-size:12px;color:var(--muted)">${v}%</div></div>`; 
+            bars.appendChild(b); 
+            setTimeout(()=>{ b.querySelector('.bar-inner').style.height = v+'%'; }, 100 + (idx * 50)); 
+        });
+        barsWrap.appendChild(bars);
+
+        // Pie Chart
+        const pieWrap = document.createElement('div');
+        pieWrap.style.flex = '1';
+        pieWrap.style.minWidth = '220px';
+        pieWrap.style.display = 'flex';
+        pieWrap.style.alignItems = 'center';
+        pieWrap.style.justifyContent = 'center';
+        pieWrap.style.gap = '16px';
+        
+        const colors = ['#1ab3b8', '#38bdf8', '#6ee7b7', '#818cf8', '#f472b6', '#fbbf24'];
+        const legend = document.createElement('div'); legend.className='pie-legend';
+
+        keys.forEach((k,i)=>{
+          const v = an[k];
+          const c = colors[i%colors.length];
+          
+          const item = document.createElement('div'); item.className='pie-item';
+          item.innerHTML = `<div class="pie-dot" style="background:${c}"></div><span>${k} (${v}%)</span>`;
+          legend.appendChild(item);
+        });
+
+        const pie = document.createElement('div'); pie.className='pie-chart';
+        pie.style.background = 'conic-gradient(transparent 0% 100%)';
+
+        pieWrap.appendChild(pie);
+        pieWrap.appendChild(legend);
+
+        chartRow.appendChild(barsWrap);
+        chartRow.appendChild(pieWrap);
+        dashAnalysis.appendChild(chartRow);
+
+        // Animate Pie
+        let pieProgress = 0;
+        const animatePie = () => {
+          pieProgress += 2; // Adjust for speed (2% per frame ≈ 800ms total)
+          if(pieProgress > 100) pieProgress = 100;
+          
+          let currentStart = 0;
+          let currentGradient = [];
+          for(let i=0; i<keys.length; i++){
+            const v = an[keys[i]];
+            const c = colors[i%colors.length];
+            if(currentStart >= pieProgress) break;
+            const end = Math.min(currentStart + v, pieProgress);
+            currentGradient.push(`${c} ${currentStart}% ${end}%`);
+            currentStart += v;
+          }
+          if(pieProgress < 100) currentGradient.push(`transparent ${pieProgress}% 100%`);
+          
+          pie.style.background = `conic-gradient(${currentGradient.join(', ')})`;
+          
+          if(pieProgress < 100) requestAnimationFrame(animatePie);
+        };
+        setTimeout(() => requestAnimationFrame(animatePie), 100);
+      } else {
+        dlBtn.style.display = 'none';
+        dashAnalysis.innerHTML = '<div class="muted">No analysis done yet.</div>';
+      }
+
+      // severity: estimate from analysis
+      const sev = lastAnalysis? Math.min(95, Object.values(lastAnalysis.analysis).reduce((a,b)=>a+b,0)/Object.values(lastAnalysis.analysis).length) : 5;
+      setTimeout(()=>{ document.getElementById('sev_bar').style.width = (sev)+'%'; }, 100);
+
+      // Populate dashboard meds
+      const dashMeds = document.getElementById('dash_meds');
+      const myMeds = medications.filter(m=>m.user===currentUser.email).sort((a,b)=>a.time.localeCompare(b.time));
+      if(myMeds.length === 0) {
+        dashMeds.innerHTML = '<div class="muted" style="font-size:13px">No medications tracked.</div>';
+      } else {
+        dashMeds.innerHTML = myMeds.map(m => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.05)"><span style="font-size:13px"><strong>${m.name}</strong> <span class="muted">(${m.dosage})</span></span><span style="font-size:12px;font-weight:bold;color:var(--accent)">⏰ ${m.time}</span></div>`).join('');
+      }
+
+      // appointments
+      const apList = document.getElementById('appt_list'); apList.innerHTML='';
+      const myAppts = appointments.filter(a=>a.user===currentUser.email);
+      if(myAppts.length===0) apList.innerHTML='<div class="muted">No appointments yet.</div>';
+      myAppts.forEach(a=>{
+        const item = document.createElement('div'); item.className='appt-item';
+        item.innerHTML = `<div><strong>${a.doc.name}</strong><div class="muted">${a.doc.spec} • ${a.date} ${a.time}</div></div><div style="display:flex;gap:8px"><button class="btn btn-ghost" style="color:#e11d48;border-color:rgba(225,29,72,0.2)" id="c_${a.id}">Cancel</button><button class="btn btn-ghost" id="d_${a.id}">Details</button></div>`;
+        apList.appendChild(item);
+
+        // Cancel handler
+        document.getElementById(`c_${a.id}`).onclick = ()=>{
+          if(confirm('Are you sure you want to cancel this appointment?')){
+            appointments = appointments.filter(x=>x.id!==a.id);
+            save('mi_appts',appointments);
+            renderDashboard();
+          }
+        };
+        
+        // Details handler
+        document.getElementById(`d_${a.id}`).onclick = () => showApptDetails(a);
+      });
+
+      // logout / back
+      const footer = document.createElement('div'); footer.style.marginTop='12px'; footer.style.display='flex'; footer.style.justifyContent='space-between'; footer.innerHTML = `<div class="muted">Logged in as ${currentUser.email}</div><div><button class="btn btn-ghost" id="to_home">Home</button> <button class="btn btn-ghost" id="logout">Logout</button></div>`;
+      app.appendChild(footer);
+      
+      // Health tracker button handler
+      document.getElementById('btn_health_track').onclick = renderHealthTracker;
+            // resend verification handler
+            const rv = document.getElementById('resend_verify');
+            if(rv){ rv.onclick = ()=>{
+              const otp = String(Math.floor(100000+Math.random()*900000));
+              alert('Simulated verification OTP: '+otp);
+              const v = prompt('Enter OTP to verify:');
+              if(v===otp){ currentUser.verified = true; save('mi_session', currentUser); const idx = users.findIndex(u=>u.email===currentUser.email); if(idx!==-1){ users[idx].verified=true; save('mi_users', users);} showToast('Account verified','success'); renderDashboard(); } else { showToast('OTP incorrect','error'); }
+            }}
+      // Test recommendations button handler
+      document.getElementById('btn_diet_planner').onclick = renderDietPlanner;
+      document.getElementById('btn_medications').onclick = renderMedications;
+      document.getElementById('btn_tests').onclick = renderTestRecommendations;
+      // Emergency contacts button handler
+      document.getElementById('btn_emergency').onclick = renderEmergencyContacts;
+      
+      document.getElementById('to_home').onclick = renderLanding;
+      document.getElementById('logout').onclick = ()=>{ currentUser=null; save('mi_session',null); renderLanding(); };
+    }
+
+    // Health Tracker Feature
+    function renderHealthTracker(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Health Tracker</h1>
+            <p class="lead">Track your daily health metrics and wellness goals.</p>
+          </div>
+        </header>
+        <div class="row">
+          <div class="col">
+            <div class="card">
+              <h3>Daily Metrics</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                  <label>Steps Today</label>
+                  <input type="number" class="input" id="h_steps" placeholder="0" min="0" max="50000" />
+                </div>
+                <div>
+                  <label>Water Intake (glasses)</label>
+                  <input type="number" class="input" id="h_water" placeholder="0" min="0" max="20" />
+                </div>
+                <div>
+                  <label>Sleep (hours)</label>
+                  <input type="number" class="input" id="h_sleep" placeholder="0" min="0" max="12" step="0.5" />
+                </div>
+                <div>
+                  <label>Exercise (minutes)</label>
+                  <input type="number" class="input" id="h_exercise" placeholder="0" min="0" max="300" />
+                </div>
+              </div>
+              <button class="btn btn-primary" id="h_save" style="margin-top:12px;width:100%">Save Metrics</button>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card">
+              <h3>Today's Summary</h3>
+              <div id="h_summary" class="muted" style="line-height:1.8"></div>
+              <div style="margin-top:12px;padding:12px;background:rgba(26,179,184,0.1);border-radius:12px">
+                <div style="font-size:13px;color:var(--muted)">Daily Goals</div>
+                <div style="margin-top:8px;font-size:12px">
+                  <div>✓ 10,000 steps</div>
+                  <div>✓ 8 glasses water</div>
+                  <div>✓ 7-9 hours sleep</div>
+                  <div>✓ 30 min exercise</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px"><button class="btn btn-ghost" onclick="renderDashboard()">← Back to Dashboard</button></div>
+      `;
+      
+      const summary = document.getElementById('h_summary');
+      document.getElementById('h_steps').value = healthTracker.steps || 0;
+      document.getElementById('h_water').value = healthTracker.water || 0;
+      document.getElementById('h_sleep').value = healthTracker.sleep || 0;
+      document.getElementById('h_exercise').value = healthTracker.exercise || 0;
+      
+      updateHealthSummary();
+      
+      document.getElementById('h_save').onclick = () => {
+        healthTracker.steps = parseInt(document.getElementById('h_steps').value) || 0;
+        healthTracker.water = parseInt(document.getElementById('h_water').value) || 0;
+        healthTracker.sleep = parseFloat(document.getElementById('h_sleep').value) || 0;
+        healthTracker.exercise = parseInt(document.getElementById('h_exercise').value) || 0;
+        healthTracker.lastUpdate = new Date().toDateString();
+        save('mi_health_tracker', healthTracker);
+        updateHealthSummary();
+        alert('Health metrics saved successfully!');
+      };
+    }
+
+    function updateHealthSummary(){
+      const summary = document.getElementById('h_summary');
+      if(!summary) return;
+      summary.innerHTML = `
+        <strong>📊 Today's Progress:</strong><br>
+        Steps: <strong>${healthTracker.steps}</strong> / 10,000<br>
+        Water: <strong>${healthTracker.water}</strong> / 8 glasses<br>
+        Sleep: <strong>${healthTracker.sleep}</strong> / 8 hours<br>
+        Exercise: <strong>${healthTracker.exercise}</strong> / 30 min<br>
+        <br>
+        <strong>💡 Tip:</strong> Consistent healthy habits improve immunity and reduce disease risk by 40%!
+      `;
+    }
+
+    function renderEditProfile() {
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Edit Profile</h1>
+            <p class="lead">Update your personal information and profile picture.</p>
+          </div>
+        </header>
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label>Name</label>
+              <input class="input" id="edit_name" value="${currentUser.name || ''}" />
+            </div>
+            <div>
+              <label>DOB</label>
+              <input type="date" class="input" id="edit_dob" value="${currentUser.dob || ''}" />
+            </div>
+            <div>
+              <label>Email</label>
+              <input class="input" id="edit_email" value="${currentUser.email || ''}" readonly style="background:#eee" />
+            </div>
+            <div>
+              <label>Phone</label>
+              <input class="input" id="edit_phone" value="${currentUser.phone || ''}" />
+            </div>
+            <div>
+              <label>Gender</label>
+              <select class="input" id="edit_gender">
+                <option value="" ${!currentUser.gender ? 'selected' : ''}>Select gender</option>
+                <option value="Male" ${currentUser.gender==='Male' ? 'selected' : ''}>Male</option>
+                <option value="Female" ${currentUser.gender==='Female' ? 'selected' : ''}>Female</option>
+                <option value="Other" ${currentUser.gender==='Other' ? 'selected' : ''}>Other</option>
+                <option value="Prefer not to say" ${currentUser.gender==='Prefer not to say' ? 'selected' : ''}>Prefer not to say</option>
+              </select>
+            </div>
+            <div>
+              <label>Profile Picture</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="file" id="edit_pic" accept="image/*" />
+                <div id="edit_pic_preview" style="width:56px;height:56px;border-radius:8px;overflow:hidden;background:#f3f4f6;display:flex;align-items:center;justify-content:center">${currentUser.picture?`<img src="${currentUser.picture}" style="width:100%;height:100%;object-fit:cover"/>`:'Preview'}</div>
+              </div>
+              <input type="hidden" id="edit_pic_data" />
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" id="update_profile_btn">Save Changes</button>
+                <button class="btn btn-ghost" id="cancel_edit_btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div id="edit_msg" class="muted" style="margin-top:8px"></div>
+        </div>
+      `;
+
+      // picture preview handling
+      const picInput = document.getElementById('edit_pic');
+      const picPreview = document.getElementById('edit_pic_preview');
+      const picData = document.getElementById('edit_pic_data');
+      picInput.onchange = (e) => {
+        const f = e.target.files && e.target.files[0];
+        if(!f) return;
+        const reader = new FileReader();
+        reader.onload = function(ev){ picData.value = ev.target.result; picPreview.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover"/>`; };
+        reader.readAsDataURL(f);
+      };
+
+      document.getElementById('update_profile_btn').onclick = updateProfile;
+      document.getElementById('cancel_edit_btn').onclick = renderDashboard;
+    }
+
+    function updateProfile() {
+      const name = document.getElementById('edit_name').value.trim();
+      const dob = document.getElementById('edit_dob').value;
+      const phone = document.getElementById('edit_phone').value.trim();
+      const gender = document.getElementById('edit_gender').value;
+      const msg = document.getElementById('edit_msg');
+      if (!name || !dob || !phone || !gender) { msg.textContent = 'Please fill all fields.'; return; }
+      currentUser.name = name;
+      currentUser.dob = dob;
+      currentUser.phone = phone;
+      currentUser.gender = gender;
+      // if a new picture was uploaded, persist it
+      const picData = document.getElementById('edit_pic_data');
+      if(picData && picData.value){ currentUser.picture = picData.value; }
+      save('mi_session', currentUser);
+      const userIndex = users.findIndex(u => u.email === currentUser.email);
+      if (userIndex !== -1) { users[userIndex] = { ...users[userIndex], ...currentUser }; save('mi_users', users); }
+      msg.textContent = 'Profile updated successfully!';
+      msg.style.color = 'green';
+      setTimeout(renderDashboard, 1000);
+    }
+
+    // Test Recommendations Feature
+    function renderTestRecommendations(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Recommended Medical Tests</h1>
+            <p class="lead">Medical tests based on your recent diagnosis and symptoms.</p>
+          </div>
+        </header>
+      `;
+      
+      const area = document.createElement('div');
+      area.style.display = 'flex';
+      area.style.flexWrap = 'wrap';
+      area.style.gap = '14px';
+      
+      if(lastAnalysis){
+        const an = lastAnalysis.analysis;
+        const keys = Object.keys(an).sort((a,b)=>an[b]-an[a]);
+        
+        keys.forEach(disease => {
+          if(an[disease] > 0){
+            const tests = TEST_RECOMMENDATIONS[disease] || ['Consult doctor for advised tests'];
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.minWidth = '280px';
+            card.innerHTML = `
+              <h4>${disease}</h4>
+              <div class="muted" style="font-size:13px;margin-bottom:8px">Confidence: ${an[disease]}%</div>
+              <div class="muted" style="font-size:12px;line-height:1.8">
+                <strong>Recommended Tests:</strong><br>
+                ${tests.map(t => `• ${t}`).join('<br>')}
+              </div>
+            `;
+            area.appendChild(card);
+          }
+        });
+      } else {
+        area.innerHTML = '<div class="card muted">No analysis yet. Please run symptom analysis first.</div>';
+      }
+      
+      app.appendChild(area);
+      const btn = document.createElement('div');
+      btn.style.marginTop = '12px';
+      btn.innerHTML = '<button class="btn btn-ghost" onclick="renderDashboard()">← Back to Dashboard</button>';
+      app.appendChild(btn);
+    }
+
+    // Emergency Contacts Feature
+    function renderEmergencyContacts(){
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Emergency Contacts</h1>
+            <p class="lead">Quick access to emergency numbers and support services.</p>
+          </div>
+        </header>
+        <div class="row">
+      `;
+      
+      const row = document.createElement('div');
+      row.style.display = 'grid';
+      row.style.gridTemplateColumns = 'repeat(auto-fit, minmax(250px, 1fr))';
+      row.style.gap = '14px';
+      row.style.marginBottom = '12px';
+      
+      Object.entries(EMERGENCY_CONTACTS).forEach(([name, number]) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.background = 'linear-gradient(200deg, rgba(225,29,72,0.15), rgba(244,63,94,0.1))';
+        card.innerHTML = `
+          <h4>${name}</h4>
+          <div style="font-size:24px;font-weight:bold;color:var(--text);margin:12px 0">${number}</div>
+          <button class="btn btn-primary" style="width:100%;font-size:13px" onclick="navigator.clipboard.writeText('${number}').then(()=>alert('Copied: ${number}'))">Copy Number</button>
+        `;
+        row.appendChild(card);
+      });
+      
+      app.appendChild(row);
+      
+      const info = document.createElement('div');
+      info.className = 'card';
+      info.style.background = 'linear-gradient(200deg, rgba(56,189,248,0.15), rgba(96,165,250,0.1))';
+      info.innerHTML = `
+        <h3>Health Emergency Guidelines</h3>
+        <ul class="muted" style="padding-left:18px;line-height:1.8">
+          <li><strong>Chest Pain/Difficulty breathing:</strong> Call Ambulance (102) immediately</li>
+          <li><strong>Severe Allergic Reaction:</strong> Use Poison helpline or go to ER</li>
+          <li><strong>Mental Health Crisis:</strong> Contact crisis helpline - trained counselors available</li>
+          <li><strong>Suspected Poisoning:</strong> Call Poison control immediately with details</li>
+          <li><strong>Major Injury/Accident:</strong> Call Police (100) or Ambulance (102)</li>
+        </ul>
+      `;
+      app.appendChild(info);
+      
+      const btn = document.createElement('div');
+      btn.style.marginTop = '12px';
+      btn.innerHTML = '<button class="btn btn-ghost" onclick="renderDashboard()">← Back to Dashboard</button>';
+      app.appendChild(btn);
+    }
+
+    function renderDietPlanner() {
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Diet & Nutrition Planner</h1>
+            <p class="lead">Personalized dietary recommendations based on your health analysis.</p>
+          </div>
+        </header>
+      `;
+
+      const container = document.createElement('div');
+      container.className = 'card';
+
+      if (!lastAnalysis || !lastAnalysis.analysis) {
+        container.innerHTML = '<div class="muted">No analysis found. Please complete a symptom diagnosis first to get a personalized diet plan.</div>';
+        app.appendChild(container);
+      } else {
+        const topDisease = Object.keys(lastAnalysis.analysis).sort((a, b) => lastAnalysis.analysis[b] - lastAnalysis.analysis[a])[0];
+        const plan = DIET_PLANS[topDisease];
+
+        if (!plan) {
+          container.innerHTML = `<div class="muted">No specific diet plan available for "<strong>${topDisease}</strong>". A general healthy diet is recommended. Eat plenty of fruits, vegetables, and whole grains.</div>`;
+        } else {
+          let samplePlanHtml = '';
+          if (plan.samplePlan && Object.keys(plan.samplePlan).length > 0) {
+            samplePlanHtml += `<h4 style="margin-top:24px;">Sample Weekly Plan</h4><div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">`;
+            for (const day in plan.samplePlan) {
+              samplePlanHtml += `
+                <div class="card" style="padding:12px; background: rgba(255,255,255,0.7);">
+                  <strong>${day}</strong>
+                  <ul class="muted" style="padding-left:18px; margin-top:6px; font-size:12px; line-height:1.6;">
+                    <li><strong>B:</strong> ${plan.samplePlan[day].Breakfast}</li>
+                    <li><strong>L:</strong> ${plan.samplePlan[day].Lunch}</li>
+                    <li><strong>D:</strong> ${plan.samplePlan[day].Dinner}</li>
+                  </ul>
+                </div>
+              `;
+            }
+            samplePlanHtml += `</div>`;
+          }
+
+          container.innerHTML = `
+            <h3 style="margin-top:0;">Diet Plan for: <span style="color:var(--accent)">${topDisease}</span></h3>
+            <p class="muted">${plan.description}</p>
+            <div class="row" style="gap: 18px; margin-top: 20px; align-items: flex-start;">
+              <div class="col">
+                <div class="card" style="background: linear-gradient(180deg, rgba(110, 231, 183, 0.15), rgba(110, 231, 183, 0.05));">
+                  <h4 style="color: #047857;">✅ Foods to Eat</h4>
+                  <ul class="muted" style="padding-left: 20px; line-height: 1.8;">
+                    ${plan.foodsToEat.map(food => `<li>${food}</li>`).join('')}
+                  </ul>
+                </div>
+              </div>
+              <div class="col">
+                <div class="card" style="background: linear-gradient(180deg, rgba(244, 63, 94, 0.15), rgba(244, 63, 94, 0.05));">
+                  <h4 style="color: #be123c;">❌ Foods to Avoid</h4>
+                  <ul class="muted" style="padding-left: 20px; line-height: 1.8;">
+                    ${plan.foodsToAvoid.map(food => `<li>${food}</li>`).join('')}
+                  </ul>
+                </div>
+              </div>
+            </div>
+            ${samplePlanHtml}
+          `;
+        }
+        app.appendChild(container);
+      }
+
+      const backBtn = document.createElement('div');
+      backBtn.style.marginTop = '12px';
+      backBtn.innerHTML = '<button class="btn btn-ghost" onclick="renderDashboard()">← Back to Dashboard</button>';
+      app.appendChild(backBtn);
+    }
+
+    function renderMedications() {
+      app.innerHTML = `
+        <header>
+          <div class="logo">MI</div>
+          <div>
+            <h1>Medication Reminders</h1>
+            <p class="lead">Manage your daily prescriptions and get timely alerts.</p>
+          </div>
+        </header>
+        <div class="row">
+          <div class="col" style="flex:1;min-width:280px">
+            <div class="card">
+              <h3 style="margin-top:0">Add New Medication</h3>
+              <label>Medicine Name</label>
+              <input type="text" class="input" id="med_name" placeholder="e.g. Amoxicillin" style="margin-bottom:10px" />
+              <label>Dosage</label>
+              <input type="text" class="input" id="med_dosage" placeholder="e.g. 1 Tablet (500mg)" style="margin-bottom:10px" />
+              <label>Reminder Time</label>
+              <input type="time" class="input" id="med_time" style="margin-bottom:14px" />
+              <button class="btn btn-primary" id="add_med_btn" style="width:100%">Add Reminder</button>
+            </div>
+          </div>
+          <div class="col" style="flex:2;min-width:300px">
+            <div class="card">
+              <h3 style="margin-top:0">Your Prescriptions</h3>
+              <div id="med_list" style="display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:400px;overflow-y:auto;padding-right:8px"></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px"><button class="btn btn-ghost" onclick="renderDashboard()">← Back to Dashboard</button></div>
+      `;
+
+      const updateMedList = () => {
+        const list = document.getElementById('med_list');
+        list.innerHTML = '';
+        const myMeds = medications.filter(m=>m.user===currentUser.email).sort((a,b)=>a.time.localeCompare(b.time));
+        if(myMeds.length === 0) {
+          list.innerHTML = '<div class="muted">No medications added yet.</div>';
+          return;
+        }
+        myMeds.forEach(m => {
+          const item = document.createElement('div');
+          item.className = 'appt-item';
+          item.innerHTML = `
+            <div>
+              <strong style="font-size:15px">${m.name}</strong>
+              <div class="muted" style="margin-top:2px">${m.dosage} • ⏰ ${m.time}</div>
+            </div>
+            <button class="btn btn-ghost del-btn" style="color:#e11d48;border-color:rgba(225,29,72,0.2);padding:6px 12px;font-size:12px">Remove</button>
+          `;
+          item.querySelector('.del-btn').onclick = () => {
+            medications = medications.filter(x => x.id !== m.id);
+            save('mi_meds', medications);
+            updateMedList();
+          };
+          list.appendChild(item);
+        });
+      };
+
+      updateMedList();
+
+      document.getElementById('add_med_btn').onclick = () => {
+        const name = document.getElementById('med_name').value.trim();
+        const dosage = document.getElementById('med_dosage').value.trim();
+        const time = document.getElementById('med_time').value;
+        if(!name || !time) { showToast('Medicine Name and Reminder Time are required', 'error'); return; }
+        
+        medications.push({ id: Date.now(), user: currentUser.email, name, dosage, time, lastNotified: null });
+        save('mi_meds', medications);
+        showToast('Medication added successfully', 'success');
+        
+        document.getElementById('med_name').value = '';
+        document.getElementById('med_dosage').value = '';
+        document.getElementById('med_time').value = '';
+        updateMedList();
+      };
+    }
+
+    function checkMedications() {
+      if(!currentUser) return;
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0,5); // Gets HH:MM format naturally
+      const todayStr = now.toDateString();
+      
+      let updated = false;
+      medications.filter(m => m.user === currentUser.email).forEach(m => {
+        if(m.time === currentTime && m.lastNotified !== todayStr) {
+          showToast(`💊 Reminder: It's time to take ${m.name} (${m.dosage})`, 'info', 10000); // 10 second toast
+          m.lastNotified = todayStr;
+          updated = true;
+        }
+      });
+      if(updated) save('mi_meds', medications);
+    }
+
+    function init(){
+      // load from storage
+      const u = load('mi_session'); if(u) currentUser=u;
+      const us = load('mi_users'); if(us) { while(users.length) users.pop(); us.forEach(x=>users.push(x)); }
+      const la = load('mi_last_analysis'); if(la) lastAnalysis=la;
+      const ap = load('mi_appts'); if(ap) { while(appointments.length) appointments.pop(); ap.forEach(x=>appointments.push(x)); }
+      const md = load('mi_meds'); if(md) { while(medications.length) medications.pop(); md.forEach(x=>medications.push(x)); }
+      if(currentUser) renderDashboard(); else renderLanding();
+
+      // Start checking for medication reminders every 60 seconds
+      if(medCheckInterval) clearInterval(medCheckInterval);
+      medCheckInterval = setInterval(checkMedications, 60000);
+      setTimeout(checkMedications, 1000); // Trigger a check immediately upon loading
+    }
+
+    init();
+
+    // Theme Toggle
+    const toggleBtn = document.getElementById('theme_toggle');
+    const root = document.documentElement;
+    function setTheme(t){
+      root.setAttribute('data-theme', t);
+      localStorage.setItem('mi_theme', t);
+      toggleBtn.textContent = t==='dark' ? '☀️' : '🌙';
+    }
+    toggleBtn.onclick = ()=>{
+      const c = root.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+      setTheme(c);
+    };
+    setTheme(localStorage.getItem('mi_theme')||'light');
+
+    // Chatbot Logic
+    function toggleChat() {
+      const w = document.getElementById('chat_widget');
+      w.style.display = w.style.display === 'none' ? 'flex' : 'none';
+      if(w.style.display === 'flex') document.getElementById('chat_input').focus();
+    }
+
+    function clearChat() {
+      document.getElementById('chat_msgs').innerHTML = '<div style="align-self:flex-start;background:rgba(255,255,255,0.8);padding:8px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:#333">Chat cleared. How can I help?</div>';
+    }
+
+    function exportChat() {
+      const msgs = document.getElementById('chat_msgs').innerText;
+      const blob = new Blob([msgs], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MI_Chat_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function quickAction(txt) {
+      document.getElementById('chat_input').value = txt;
+      sendChat();
+    }
+
+    function sendChat() {
+      const input = document.getElementById('chat_input');
+      const txt = input.value.trim();
+      if(!txt) return;
+      
+      addMsg(txt, 'user');
+      input.value = '';
+      
+      // Typing indicator
+      const box = document.getElementById('chat_msgs');
+      const typing = document.createElement('div'); typing.className='typing'; typing.id='typing_ind';
+      typing.innerHTML = '<span></span><span></span><span></span>';
+      box.appendChild(typing); box.scrollTop = box.scrollHeight;
+
+      setTimeout(() => {
+        if(document.getElementById('typing_ind')) document.getElementById('typing_ind').remove();
+        const response = getBotResponse(txt);
+        addMsg(response, 'bot');
+      }, 600);
+    }
+
+    function addMsg(txt, type) {
+      const div = document.createElement('div');
+      div.style.padding = '8px 12px';
+      div.style.borderRadius = type === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0';
+      div.style.maxWidth = '85%';
+      div.style.fontSize = '13px';
+      if (type === 'user') {
+        div.style.alignSelf = 'flex-end';
+        div.style.background = 'var(--accent)';
+        div.style.color = 'white';
+      } else {
+        div.style.alignSelf = 'flex-start';
+        div.style.background = 'rgba(255,255,255,0.8)';
+        div.style.color = '#333';
+      }
+      div.textContent = txt;
+      const box = document.getElementById('chat_msgs');
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function getBotResponse(text) {
+      const lower = text.toLowerCase();
+      if (lower.includes('report') || lower.includes('email') || lower.includes('file')) return "I've noted your details. A report has been filed to system@mediai.com.";
+      
+      // Navigation commands
+      if (lower.includes('symptom') || lower.includes('check') || lower.includes('diagnose')) {
+        setTimeout(renderSymptoms, 1000);
+        return "Opening the Symptom Checker for you...";
+      }
+      if (lower.includes('book') || lower.includes('doctor') || lower.includes('appointment')) {
+        setTimeout(renderDoctors, 1000);
+        return "Navigating to Doctor Booking...";
+      }
+      if (lower.includes('emergency') || lower.includes('help')) return "If this is a medical emergency, please call 911 immediately. I am just an AI assistant.";
+
+      // Doctor recommendations
+      const specialties = ['Cardiologist', 'Pulmonologist', 'General Physician', 'Neurologist', 'Dermatologist', 'Pediatrician'];
+      const foundSpec = specialties.find(s => lower.includes(s.toLowerCase()));
+      if(foundSpec) {
+         const docs = DOC_PROFILES.filter(d => d.spec.toLowerCase() === foundSpec.toLowerCase());
+         if(docs.length) return `I recommend: ${docs.map(d => d.name).join(', ')}. Would you like to book an appointment?`;
+         return `We have specialists for ${foundSpec}, but none are listed right now.`;
+      }
+      if (lower.includes('tip') || lower.includes('advice')) return "Health Tip: " + HEALTH_TIPS[Math.floor(Math.random() * HEALTH_TIPS.length)];
+
+      let disease = Object.keys(DISEASES).find(d => lower.includes(d.toLowerCase()));
+      if (!disease) return lower.includes('hi')||lower.includes('hello') ? "Hello! Ask me about diseases, medicines, or prevention." : "I'm not sure. Try asking about Cold, Flu, COVID, Asthma, Migraine, or Heart Issues.";
+      if (lower.includes('medicine') || lower.includes('medication') || lower.includes('drug')) return `Medicines for ${disease}: ${MEDICINES[disease]?.join(', ') || 'Consult a doctor.'}`;
+      if (lower.includes('prevent') || lower.includes('avoid')) return `Prevention for ${disease}: ${PREVENTIONS[disease]?.join(', ') || 'Maintain hygiene.'}`;
+      return `${disease}: ${DISEASES[disease].join(', ')}. Ask about medicines or prevention!`;
+    }
+
+    // Voice Input
+    function startVoiceInput() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert("Voice input is not supported in this browser.");
+        return;
+      }
+      
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      const micBtn = document.getElementById('mic_btn');
+      
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        micBtn.style.color = '#e11d48';
+      };
+      recognition.onend = () => {
+        micBtn.style.color = '';
+      };
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('chat_input').value = transcript;
+        setTimeout(sendChat, 500); // Auto-send after a short delay
+      };
+      
+      recognition.start();
+    }
+
+    // Dynamic effects removed as requested
+  </script>
+</body>
+</html>
